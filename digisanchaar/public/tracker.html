@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Track Your Status – Digi Sanchaar</title><meta name="robots" content="noindex">
+<link rel="icon" href="/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/brand.css">
+<style>
+.tcard{background:var(--card2);border:1.5px solid rgba(93,179,43,.5);border-radius:20px;padding:14px 14px 12px;margin-top:14px;text-align:left}
+.tcard h3.rt{display:flex;align-items:center;gap:8px;margin:0 0 8px;font-size:13.5px;color:var(--green-d)}
+.tcard table{min-width:0;font-size:13px}.tcard td{padding:6px 0;border-bottom:1px solid rgba(10,26,92,.08);background:none;vertical-align:top}
+.tcard tr:last-child td{border-bottom:none}.tcard td:first-child{color:var(--mute);font-weight:700;width:42%;padding-right:8px}.tcard td:last-child{font-weight:700;word-break:break-word}
+.tcard .mono{font-family:var(--fm);font-size:12px}
+.ptitle{text-align:center;font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--ink);margin:2px 0 12px}
+.prow{display:flex;flex-wrap:wrap;justify-content:center;gap:14px 10px}
+.citem{display:flex;flex-direction:column;align-items:center;gap:5px;width:84px;animation:rise .5s both}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.cbadge{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;border:2.5px solid}
+.cbadge.successful{background:var(--green);border-color:var(--green-d);color:#fff;box-shadow:0 6px 14px rgba(63,138,18,.35)}
+.cbadge.pending{background:#FFF4DB;border-color:#E0A21A;color:var(--amber)}
+.cbadge.rejected{background:#FDE7E7;border-color:var(--rose);color:var(--rose)}
+.gt{font-size:11px;font-weight:700;text-align:center;line-height:1.3;color:var(--ink);word-break:break-word}
+.st{font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.st.successful{color:var(--green-d)}.st.pending{color:var(--amber)}.st.rejected{color:var(--rose)}
+.err{margin-top:14px;padding:12px 14px;border-radius:14px;background:#FDE7E7;border:1px solid rgba(209,67,67,.5);color:#7A1F1F;font-size:13px;font-weight:600;text-align:center}
+.spin{width:30px;height:30px;margin:0 auto 8px;border-radius:50%;border:3px solid rgba(10,26,92,.15);border-top-color:var(--green);animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.ld{display:none;text-align:center;margin:20px 0 4px;font-size:12.5px;font-weight:700;color:var(--mute)}
+.chip{display:none;text-align:center;margin-top:14px}
+.chip span,.back span{display:inline-block;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--ink);padding:8px 16px;border-radius:999px;border:1.5px solid var(--ink);background:#fff}
+.back{display:none;text-align:center;margin-top:12px}
+.ahead{display:flex;justify-content:space-between;align-items:center;margin:14px 0 8px}.ahead h4{font-size:13px;font-weight:800}.ahead small{font-size:11px;font-weight:700;color:var(--mute)}
+.arow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;margin-bottom:8px;border-radius:14px;background:#fff;border:1px solid var(--line);cursor:pointer;animation:rise .4s both}
+.arow:hover{border-color:var(--ink)}.arow .l{min-width:0;flex:1}.arow .c{font-size:13px;font-weight:800;word-break:break-word}.arow .d{font-family:var(--fm);font-size:11px;color:var(--mute);margin-top:2px}
+.pill2{font-size:10px;font-weight:800;letter-spacing:.06em;padding:5px 10px;border-radius:999px;border:1px solid}
+.pill2.successful,.pill2.paid{background:rgba(93,179,43,.15);border-color:var(--green-d);color:var(--green-d)}
+.pill2.pending{background:#FFF4DB;border-color:#E0A21A;color:var(--amber)}.pill2.rejected{background:#FDE7E7;border-color:var(--rose);color:var(--rose)}
+.nohist{text-align:center;font-size:12.5px;font-weight:600;color:var(--mute);padding:12px}
+#mute{position:fixed;right:max(14px,env(safe-area-inset-right));bottom:max(14px,env(safe-area-inset-bottom));width:42px;height:42px;margin:0;padding:0;border-radius:50%;background:#fff;border:1.5px solid var(--ink);box-shadow:0 6px 16px rgba(10,26,92,.2);z-index:20}
+#mute:before{display:none}#mute.muted{opacity:.7}
+</style></head><body>
+<div class="wrap">
+<div class="logo"><span><img src="/logo.png" alt="Digi Sanchaar – a true marketing agency"></span></div>
+<div class="badge-wrap"><div class="pill"><span class="dot"></span>Live Status Tracker</div></div>
+<h1>Track Your Status</h1>
+<p class="sub">Enter your UPI ID to see real-time progress.</p>
+
+<div class="card">
+ <h2>Check Offer Status</h2>
+ <label for="upi" style="margin-top:0">UPI ID</label>
+ <input id="upi" type="text" placeholder="e.g. rahul@okaxis" autocapitalize="off" autocomplete="off" inputmode="email">
+ <button id="go" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg><span>Check Status</span></button>
+
+ <div id="ld" class="ld"><div class="spin"></div>Searching...</div>
+ <div id="err" class="err" style="display:none"></div>
+ <div id="back" class="back"><span id="backGo">← Back to All Entries</span></div>
+
+ <div id="res" style="display:none">
+  <div class="tcard">
+   <h3 class="rt"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Record Found!</h3>
+   <table>
+    <tr><td>Name:</td><td id="vName">-</td></tr>
+    <tr><td>Click Time (IST):</td><td id="vClick" class="mono">-</td></tr>
+    <tr><td>Last Updated:</td><td id="vUpd" class="mono">-</td></tr>
+    <tr><td>Campaign:</td><td id="vCamp">-</td></tr>
+   </table>
+  </div>
+  <div class="tcard"><div class="ptitle">Campaign Progress</div><div id="goals" class="prow"></div></div>
+ </div>
+
+ <div id="hchip" class="chip"><span id="hlabel">🕑 View Previous Entries</span></div>
+ <div id="hld" class="ld">Loading your previous entries...</div>
+ <div id="hlist" style="display:none"><div class="ahead"><h4>🕑 Previous Entries</h4><small id="hcount"></small></div><div id="hrows"></div></div>
+ <div class="trust">Only your own progress is shown. No payout amounts.</div>
+</div>
+
+<div class="marquee"><div class="mt">
+<span>Instant UPI payout<em>✦</em></span><span>Verified rewards<em>✦</em></span><span>100% secure<em>✦</em></span><span>Fast payouts<em>✦</em></span>
+<span>Instant UPI payout<em>✦</em></span><span>Verified rewards<em>✦</em></span><span>100% secure<em>✦</em></span><span>Fast payouts<em>✦</em></span>
+</div></div>
+</div>
+
+<button id="mute" type="button" aria-label="Toggle sound">
+ <svg id="sOn" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0A1A5C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+ <svg id="sOff" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#D14343" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+</button>
+<script src="/js/config.js"></script><script src="/js/common.js"></script><script src="/js/tracker.js"></script>
+</body></html>

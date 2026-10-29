@@ -1,0 +1,20 @@
+# Netlify rewrites (first match wins). Files that really exist (/css, /js, /logo.png) are always served as they are.
+
+# Old query-style links -> new path-style links
+/   cid=:cid ref=:ref   /:cid/:ref   301
+/   cid=:cid            /:cid/DIRECT 301
+/   page=gen            /gen         301
+/   page=ref            /referral    301
+/   page=mydashboard    /referral    301
+
+# The admin page is only reachable through the secret path below, never as /admin.html
+/admin.html    /404.html    404!
+/admin         /404.html    404!
+
+# Pages
+/admin/DGSNR    /admin.html      200
+/referral       /dashboard.html  200
+/gen/:cid       /linkgen.html    200
+/gen            /linkgen.html    200
+/tracker/:cid   /tracker.html    200
+/:cid/:ref      /prelander.html  200
