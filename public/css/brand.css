@@ -11,7 +11,7 @@ body{background:radial-gradient(circle at 10% 0%,var(--tint1),transparent 46%),r
 
 /* logo + heading */
 .logo,.brand{display:flex;justify-content:center;margin-bottom:12px}
-.logo img,.brand img{display:block;height:112px;width:auto;max-width:80%;object-fit:contain;background:none;border-radius:0;padding:0}
+.logo img,.brand img{display:block;height:112px;width:auto;max-width:80%;object-fit:contain;background:none;border-radius:0;padding:0;margin:0 auto}
 .brand-text{font-weight:800;font-size:22px}
 h1{font-weight:800;font-size:21px;line-height:1.25;text-align:center;margin:4px 0 6px}
 h2{font-weight:800;font-size:15px;margin-bottom:14px}
