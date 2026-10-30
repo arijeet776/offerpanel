@@ -10,6 +10,10 @@ const isValidUpi = s => /^[a-zA-Z0-9._-]{2,}@[a-zA-Z0-9]{2,}$/.test(s);
 const isEmail = s => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 const likeEscape = s => String(s).replace(/[\\%_]/g, '\\$&');
 const normName = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+// Indian mobile number: ignores spaces, +91 / 91 / 0 in front. Returns the 10 digits, or '' if it is not a valid number.
+const normMobile = v => { let d = String(v == null ? '' : v).replace(/\D/g, ''); if (d.length === 12 && d.startsWith('91')) d = d.slice(2); else if (d.length === 11 && d.startsWith('0')) d = d.slice(1); return /^[6-9]\d{9}$/.test(d) ? d : ''; };
+// 9876543210 -> 98******10 (first 2 and last 2 digits stay, the middle is hidden). Use this anywhere a number is shown.
+const maskMobile = v => { const d = normMobile(v) || String(v == null ? '' : v).replace(/\D/g, ''); if (!d) return ''; return d.length <= 4 ? '*'.repeat(d.length) : d.slice(0, 2) + '*'.repeat(d.length - 4) + d.slice(-2); };
 const ah = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 class HttpError extends Error {
@@ -86,4 +90,4 @@ function convEvents(r) {
     .filter(e => e[1]).map(e => ({ no: e[0], name: e[1], at: e[2] }));
 }
 
-module.exports = { MAX_EVENTS, campEvents, convEvents, genCampaignId, parseMacros, macroList, clean, num, genId, isValidUpi, isEmail, likeEscape, normName, ah, HttpError, buildRedirect, userPayoutFor, CLICK_ID_MACRO_MAP };
+module.exports = { MAX_EVENTS, campEvents, convEvents, genCampaignId, parseMacros, macroList, clean, num, genId, isValidUpi, isEmail, normMobile, maskMobile, likeEscape, normName, ah, HttpError, buildRedirect, userPayoutFor, CLICK_ID_MACRO_MAP };

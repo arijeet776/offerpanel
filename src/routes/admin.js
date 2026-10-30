@@ -23,33 +23,122 @@ router.post('/login', rateLimit(10, 10 * 60e3), ah(async (req, res) => {
 
 router.use(requireAdmin);
 
+// Mobile / Gmail of each lead live on its click row; read them in small batches.
+async function clickInfo(ids) {
+  const out = {};
+  const uniq = [...new Set(ids.filter(Boolean))];
+  const chunks = [];
+  for (let i = 0; i < uniq.length; i += 200) chunks.push(uniq.slice(i, i + 200));
+  try {
+    for (let i = 0; i < chunks.length; i += 5) {
+      const rs = await Promise.all(chunks.slice(i, i + 5).map(ch => sb.from('clicks').select('click_id,mobile,gmail').in('click_id', ch)));
+      rs.forEach(r => (r.data || []).forEach(k => { out[k.click_id] = k; }));
+    }
+  } catch (e) { console.error('[admin] click details lookup failed:', e.message); }
+  return out;
+}
+
 // ---------- All data ----------
 router.get('/data', ah(async (req, res) => {
   const [campaigns, referrers, links, conversions, payments, withdrawals] = await Promise.all([
     fetchAll('campaigns', '*', q => q.neq('status', 'DELETED').order('created_at').order('campaign_id')),
-    fetchAll('referrers', 'ref_id,name,upi', q => q.order('ref_id')),
+    fetchAll('referrers', 'ref_id,name,upi,mobile', q => q.order('ref_id')),
     fetchAll('generated_links', '*', q => q.order('created_at', { ascending: false }).order('link_id')),
     fetchAll('conversions', '*', q => q.order('created_at', { ascending: false }).order('id')),
     fetchAll('payments', '*', q => q.order('created_at', { ascending: false }).order('payment_id')),
     fetchAll('withdrawals', '*', q => q.order('created_at', { ascending: false }).order('withdrawal_id'))
   ]);
   const rm = Object.fromEntries(referrers.map(r => [r.ref_id, r]));
+  const ci = await clickInfo(conversions.map(c => c.click_id)); // mobile / gmail the user gave on the offer page
   res.json({
     success: true, campaigns: campaigns.map(c => ({ ...c, events: U.campEvents(c) })), payments,
-    withdrawals: withdrawals.map(w => ({ ...w, ref_name: (rm[w.ref_id] || {}).name || w.name || '' })),
-    links: links.map(l => ({ ...l, ref_name: (rm[l.ref_id] || {}).name || '' })),
-    conversions: conversions.map(c => ({ ...c, events: U.convEvents(c), ref_name: (rm[c.ref_id] || {}).name || '', ref_upi: (rm[c.ref_id] || {}).upi || '' }))
+    withdrawals: withdrawals.map(w => ({ ...w, ref_name: (rm[w.ref_id] || {}).name || w.name || '', ref_mobile: (rm[w.ref_id] || {}).mobile || '' })),
+    links: links.map(l => ({ ...l, ref_name: (rm[l.ref_id] || {}).name || '', ref_mobile: (rm[l.ref_id] || {}).mobile || '' })),
+    conversions: conversions.map(c => ({
+      ...c, events: U.convEvents(c), ref_name: (rm[c.ref_id] || {}).name || '', ref_mobile: (rm[c.ref_id] || {}).mobile || '', ref_upi: (rm[c.ref_id] || {}).upi || '',
+      mobile: (ci[c.click_id] || {}).mobile || '', gmail: (ci[c.click_id] || {}).gmail || ''
+    }))
   });
+}));
+
+// ---------- Click report (latest 5000 clicks, newest first) ----------
+router.get('/reports/clicks', ah(async (req, res) => {
+  const LIMIT = 5000;
+  const { count } = await sb.from('clicks').select('*', { count: 'exact', head: true });
+  const rows = [];
+  for (let from = 0; from < LIMIT; from += 1000) {
+    const { data, error } = await sb.from('clicks').select('*').order('created_at', { ascending: false }).order('click_id').range(from, Math.min(from + 999, LIMIT - 1));
+    if (error) throw error;
+    rows.push(...data);
+    if (data.length < 1000) break;
+  }
+  const [convs, camps, refs] = await Promise.all([
+    fetchAll('conversions', 'click_id,network_click_id,final_status', q => q.order('id')),
+    fetchAll('campaigns', 'campaign_id,campaign_name', q => q.order('campaign_id')),
+    fetchAll('referrers', 'ref_id,name,mobile', q => q.order('ref_id'))
+  ]);
+  const cv = Object.fromEntries(convs.map(c => [c.click_id, c]));
+  const cn = Object.fromEntries(camps.map(c => [c.campaign_id, c.campaign_name]));
+  const rm = Object.fromEntries(refs.map(r => [r.ref_id, r]));
+  res.json({
+    success: true, total: count || rows.length, shown: rows.length,
+    clicks: rows.map(k => ({
+      click_id: k.click_id, created_at: k.created_at, campaign_id: k.campaign_id, campaign: cn[k.campaign_id] || k.campaign_id,
+      ref_id: k.ref_id, ref_label: (rm[k.ref_id] || {}).mobile || (rm[k.ref_id] || {}).name || '',
+      name: k.name || '', upi: k.upi || '', mobile: k.mobile || '', gmail: k.gmail || '', ip_address: k.ip_address || '', device_type: k.device_type || '',
+      converted: !!cv[k.click_id], network_click_id: (cv[k.click_id] || {}).network_click_id || '', final_status: (cv[k.click_id] || {}).final_status || ''
+    }))
+  });
+}));
+
+// ---------- Database viewer (read-only) ----------
+const DB_TABLES = {
+  campaigns:       { label: 'Campaigns',      order: 'created_at', search: ['campaign_id', 'campaign_name', 'platform', 'status'] },
+  referrers:       { label: 'Partners',       order: 'created_at', search: ['ref_id', 'upi', 'mobile', 'name', 'status'] },
+  generated_links: { label: 'Referral Links', order: 'created_at', search: ['link_id', 'ref_id', 'upi', 'campaign_name', 'campaign_id'] },
+  clicks:          { label: 'Clicks',         order: 'created_at', search: ['click_id', 'upi', 'name', 'mobile', 'gmail', 'ref_id', 'campaign_id', 'ip_address'] },
+  conversions:     { label: 'Conversions',    order: 'id',         search: ['click_id', 'network_click_id', 'upi', 'name', 'campaign', 'ref_id', 'final_status'] },
+  payments:        { label: 'Payments',       order: 'created_at', search: ['payment_id', 'ref_id', 'upi', 'name', 'transaction_id', 'campaign'] },
+  wallet_ledger:   { label: 'Wallet Ledger',  order: 'id',         search: ['ref_id', 'reason', 'campaign_name', 'withdrawal_id', 'note'] },
+  withdrawals:     { label: 'Withdrawals',    order: 'created_at', search: ['withdrawal_id', 'ref_id', 'upi', 'name', 'status', 'txn_id'] },
+  postback_log:    { label: 'Postback Log',   order: 'id',         search: ['result', 'campaign_id', 'click_id', 'network_click_id', 'event_name'] },
+  sync_log:        { label: 'Sheets Sync Log', order: 'id',        search: ['table_name', 'status', 'message'] }
+};
+const SECRET_KEY = /key|secret|token|pass|auth/i;
+const redact = v => Array.isArray(v) ? v.map(redact) : (v && typeof v === 'object') ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, SECRET_KEY.test(k) ? '[hidden]' : redact(x)])) : v;
+const dbRow = r => {
+  const o = { ...r }; delete o.synced_at;
+  for (const k of Object.keys(o)) if (o[k] && typeof o[k] === 'object') o[k] = redact(o[k]);
+  return o;
+};
+
+router.get('/db/tables', ah(async (req, res) => {
+  const keys = Object.keys(DB_TABLES);
+  const counts = await Promise.all(keys.map(async k => { const { count } = await sb.from(k).select('*', { count: 'exact', head: true }); return count || 0; }));
+  res.json({ success: true, tables: keys.map((k, i) => ({ key: k, label: DB_TABLES[k].label, count: counts[i] })) });
+}));
+
+router.get('/db/:table', ah(async (req, res) => {
+  const key = req.params.table, t = DB_TABLES[key];
+  if (!t) throw new HttpError(404, 'Unknown table.');
+  const size = 50, page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const term = String(req.query.q || '').replace(/[,()%*\\"'`]/g, ' ').trim().slice(0, 60);
+  let q = sb.from(key).select('*', { count: 'exact' });
+  if (term) q = q.or(t.search.map(c => c + '.ilike.%' + term + '%').join(','));
+  const { data, count, error } = await q.order(t.order, { ascending: false }).range((page - 1) * size, page * size - 1);
+  if (error) throw error;
+  const rows = (data || []).map(dbRow);
+  res.json({ success: true, table: key, label: t.label, count: count || 0, page, pages: Math.max(1, Math.ceil((count || 0) / size)), columns: rows.length ? Object.keys(rows[0]) : [], rows });
 }));
 
 // ---------- Analytics ----------
 router.get('/analytics', ah(async (req, res) => {
   const [conv, refs, clicksRes] = await Promise.all([
     fetchAll('conversions', 'id,campaign,ref_id,user_payout,ref_payout,user_status,ref_status', q => q.order('id')),
-    fetchAll('referrers', 'ref_id,name', q => q.order('ref_id')),
+    fetchAll('referrers', 'ref_id,name,mobile', q => q.order('ref_id')),
     sb.from('clicks').select('*', { count: 'exact', head: true })
   ]);
-  const rn = Object.fromEntries(refs.map(r => [r.ref_id, r.name]));
+  const rn = Object.fromEntries(refs.map(r => [r.ref_id, r.name || r.mobile]));
   const k = { total: conv.length, success: 0, pending: 0, rejected: 0, clicks: clicksRes.count || 0 };
   const byCampaign = {}, byRef = {};
   conv.forEach(c => {
@@ -277,8 +366,10 @@ router.post('/withdrawals/:id/pay', ah(async (req, res) => {
   if (error) throw error;
   if (!data.length) throw new HttpError(409, 'This request is not pending any more.');
   const w = data[0];
+  let payName = w.name;
+  if (!payName) { const { data: rr } = await sb.from('referrers').select('name,mobile').eq('ref_id', w.ref_id).maybeSingle(); payName = (rr && (rr.name || rr.mobile)) || ''; }
   const { error: e2 } = await sb.from('payments').insert({
-    payment_id: 'PAY_' + Date.now() + Math.floor(Math.random() * 900 + 100), ref_id: w.ref_id, upi: w.upi, name: w.name,
+    payment_id: 'PAY_' + Date.now() + Math.floor(Math.random() * 900 + 100), ref_id: w.ref_id, upi: w.upi, name: payName,
     amount: w.amount, transaction_id: txn, pay_type: 'WITHDRAWAL', campaign: 'WALLET', remarks: 'Wallet withdrawal ' + w.withdrawal_id
   });
   if (e2) console.error('[withdrawal] payment log insert failed', w.withdrawal_id, e2.message);

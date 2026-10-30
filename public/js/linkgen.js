@@ -33,13 +33,14 @@ $('slider').addEventListener('input', () => { if (sel) { const u = Number($('sli
 $('rx').addEventListener('click', () => $('rule').classList.add('hidden'));
 
 $('gen').addEventListener('click', async () => {
-  const upi = $('upi').value.trim(), name = $('name').value.trim();
+  const upi = $('upi').value.trim(), mobile = $('mobile').value.trim();
   msg('');
-  if (!upi || !name || !sel) return msg('Please fill UPI, Name, and select a campaign.', 'err');
+  if (!upi || !mobile || !sel) return msg('Please fill UPI, Mobile Number, and select a campaign.', 'err');
   if (!upi.includes('@')) return msg('Please enter a valid UPI ID', 'err');
+  if (!/^[6-9]\d{9}$/.test(mobile.replace(/\D/g, '').replace(/^(91|0)(?=\d{10}$)/, ''))) return msg('Please enter a valid 10-digit Mobile Number.', 'err');
   $('gen').disabled = true; $('gen').textContent = 'Generating...';
   try {
-    const r = await api('/api/links/generate', { method: 'POST', body: { upi, name, campaignId: sel.campaign_id, customUserPayout: Number($('slider').value) } });
+    const r = await api('/api/links/generate', { method: 'POST', body: { upi, mobile, campaignId: sel.campaign_id, customUserPayout: Number($('slider').value) } });
     msg(r.isExisting ? 'Existing link retrieved.' : 'Link generated successfully!', 'ok');
     $('lt').textContent = r.generatedLink; $('res').classList.add('show');
   } catch (e) { msg(e.message, 'err'); }

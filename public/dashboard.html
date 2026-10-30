@@ -23,36 +23,60 @@
 .wform label{color:rgba(255,255,255,.8);margin-top:0}.wform .hintw{font-size:11.5px;color:rgba(255,255,255,.75);margin-top:8px;line-height:1.45}
 .wform button{background:var(--green);color:#0B2204;border-bottom:3px solid #fff}
 .wmsg{margin-top:10px;font-size:12.5px;font-weight:700}
-.wtabs{display:flex;gap:8px;margin:16px 0 8px;flex-wrap:wrap}
-.wtabs button{width:auto;margin:0;padding:7px 12px;font-size:11.5px;min-height:0;background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.3);box-shadow:none}
-.wtabs button:before{display:none}
-.wtabs button.on{background:#C4E835;color:#1E2E00;border-color:#C4E835}
-.wtable{width:100%;min-width:0;border-collapse:collapse;font-size:12px;color:#fff}
-.wtable th,.wtable td{padding:7px 6px;text-align:left;border-bottom:1px solid rgba(255,255,255,.14);background:none;color:#fff}.wtable th{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.6)}
-.wtw{max-height:240px;overflow:auto}
 .cr{color:#9BE564;font-weight:800}.db{color:#FF9AA2;font-weight:800}
-.thead{display:flex;justify-content:space-between;align-items:center;margin:20px 0 10px}.thead h3{margin:0;font-size:14px}
+.mono{font-family:var(--fm);font-size:12px}
 .ev{display:inline-block;margin:2px 4px 2px 0;padding:4px 9px;border-radius:10px;background:rgba(93,179,43,.16);border:1px solid rgba(63,138,18,.55);font-size:11.5px;font-weight:800;line-height:1.25;color:var(--ink)}
 .ev small{display:block;font-weight:600;font-size:10px;color:var(--mute);margin-top:1px}
+.sect{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap;margin:22px 0 10px}.sect h3{margin:0;font-size:16px}.sect p{margin:2px 0 0;font-size:11.5px;color:var(--mute);font-weight:500}
+.rtabs2{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.rtabs2 button{width:auto;margin:0;padding:9px 16px;font-size:12.5px;min-height:0;background:#fff;color:var(--ink);border:1.5px solid var(--ink);box-shadow:none;border-radius:12px}
+.rtabs2 button:before{display:none}.rtabs2 button.on{background:var(--ink);color:#fff}
+.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end;margin-bottom:14px;padding:12px;background:var(--card2);border:1px solid rgba(93,179,43,.4);border-radius:16px}
+.filters label{margin:0 0 4px;font-size:10px}.filters input,.filters select{padding:9px 12px;font-size:13px;border-radius:12px}
+.filters .cust{display:contents}.filters .fbtns{display:flex;gap:8px}
+.filters .fbtns button{width:auto;margin:0;padding:9px 14px;font-size:12px;min-height:0;flex:1}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px}
+.tile{background:#fff;border:1px solid var(--line);border-radius:16px;padding:12px 14px;border-bottom:3px solid var(--sky)}
+.tile span{display:block;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+.tile b{display:block;margin-top:4px;font-size:19px;font-weight:800;color:var(--ink)}.tile small{display:block;margin-top:2px;font-size:10.5px;color:var(--mute);font-weight:600}
+.tile.g{border-bottom-color:var(--green)}.tile.hl{background:linear-gradient(150deg,#0A1A5C,#102A86);border-bottom-color:var(--lime)}.tile.hl span,.tile.hl small{color:rgba(255,255,255,.75)}.tile.hl b{color:#C4E835}
+.rtw{max-height:none}
+table.rt{width:100%;min-width:760px;border-collapse:collapse;font-size:12.5px}
+table.rt th{position:sticky;top:0;text-align:left;padding:10px 12px;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);background:var(--card2);border-bottom:1px solid var(--line);white-space:nowrap}
+table.rt td{padding:11px 12px;border-bottom:1px solid rgba(10,26,92,.08);vertical-align:top}
+table.rt tr:last-child td{border-bottom:none}
+table.rt td.num,table.rt th.num{text-align:right}
+.bd{display:inline-block;margin-top:3px;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+.bd.ok{background:rgba(63,138,18,.14);color:#2E6A0C}.bd.wait{background:rgba(199,119,0,.14);color:#9A5C00}.bd.bad{background:rgba(209,67,67,.13);color:#B33030}
+.empty{text-align:center;padding:26px 12px!important;color:var(--mute);font-weight:600}
+#more{margin-top:12px}
+@media(max-width:640px){
+ .rtw{border:none;background:none;overflow:visible}
+ table.rt{min-width:0}table.rt thead{display:none}table.rt,table.rt tbody,table.rt tr,table.rt td{display:block;width:100%}
+ table.rt tr{background:#fff;border:1px solid var(--line);border-radius:14px;margin-bottom:10px;padding:6px 12px}
+ table.rt td{display:flex;justify-content:space-between;gap:14px;text-align:right;border:none;padding:7px 0}
+ table.rt td:before{content:attr(data-label);flex:0 0 36%;text-align:left;font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--mute);padding-top:2px}
+ table.rt td.empty{display:block;text-align:center}table.rt td.empty:before{display:none}
+ .filters .fbtns{grid-column:1/-1}
+}
 #lo{margin-top:16px}
-#tbl{min-width:760px}#tbl td{vertical-align:top}#tbl td:nth-child(4){min-width:250px}
 </style></head><body>
 <div class="wrap wide">
 <div class="logo"><span><img src="/logo.png" alt="Digi Sanchaar – a true marketing agency"></span></div>
 <div class="badge-wrap"><div class="pill"><span class="dot"></span>Referral Dashboard</div></div>
 <h1>Referral Dashboard</h1>
-<p class="sub">View your real-time referral data.</p>
+<p class="sub">Track your referrals, earnings, withdrawals and user cashback in real time.</p>
 
 <div id="loginS" style="max-width:430px;margin:0 auto"><div class="card">
  <h2>Partner Login</h2>
- <label for="rn" style="margin-top:0">Full Name</label><input id="rn" placeholder="Enter Registered Name" autocomplete="off">
+ <label for="rn" style="margin-top:0">Mobile Number</label><input id="rn" type="tel" inputmode="numeric" maxlength="15" placeholder="Enter Registered Mobile Number" autocomplete="off">
  <label for="ru">UPI ID</label><input id="ru" placeholder="yourname@upi" autocapitalize="off" autocomplete="off">
  <button id="lb">Login to Dashboard</button><p class="msg" id="lm"></p>
 </div></div>
 
 <div id="dashS" class="hidden"><div class="card">
  <div class="profile">
-  <div><span class="l">Partner Name</span><span class="v" id="pn">-</span></div>
+  <div><span class="l">Registered Mobile</span><span class="v" id="pn" style="font-family:var(--fm)">-</span></div>
   <div><span class="l">Registered UPI</span><span class="v" id="pu" style="font-family:var(--fm)">-</span></div>
   <button id="rf" class="sec">⟳ Refresh Data</button>
  </div>
@@ -62,12 +86,21 @@
   <div class="wstats"><div><span>Total Earned</span><b id="wte">₹0</b></div><div><span>Withdrawn</span><b id="wtw">₹0</b></div><div><span>Pending Request</span><b id="wtp">₹0</b></div></div>
   <div class="wform hidden" id="wform"><label for="wamt">Amount to withdraw (₹)</label><input id="wamt" type="number" min="1" inputmode="decimal" placeholder="Enter amount">
    <div class="hintw" id="whint"></div><button id="wgo" style="margin-top:10px">Send Withdrawal Request</button><p class="wmsg" id="wmsg"></p></div>
-  <div class="wtabs"><button id="tab-h" class="on">Wallet History</button><button id="tab-w">Withdrawal Requests</button></div>
-  <div class="wtw"><table class="wtable"><thead id="wth"></thead><tbody id="wtb"></tbody></table></div>
  </div>
- <div class="thead"><h3>Your Conversions</h3></div>
- <div class="tw"><table id="tbl"><thead><tr><th>Date</th><th>Campaign ID</th><th>UPI</th><th>Events Achieved</th><th>Referral Amount</th></tr></thead><tbody id="tb"><tr><td colspan="5" style="text-align:center;padding:20px">No conversions yet</td></tr></tbody></table></div>
- <p class="sub" id="more" style="margin:10px 0 0"></p>
+ <div class="sect"><div><h3>Reports</h3><p>Your referrals, withdrawals and wallet activity. Use the filters to pick any period.</p></div></div>
+ <div class="rtabs2"><button id="t-ref" class="on">Referrals</button><button id="t-wd">Withdrawals</button><button id="t-led">Wallet Statement</button></div>
+ <div class="filters">
+  <div><label for="f-per">Period</label><select id="f-per"><option value="ALL">All Time</option><option value="TODAY">Today</option><option value="YESTERDAY">Yesterday</option><option value="7D">Last 7 Days</option><option value="30D">Last 30 Days</option><option value="MONTH">This Month</option><option value="LASTMONTH">Last Month</option><option value="CUSTOM">Custom Range</option></select></div>
+  <div class="cust hidden" id="f-cust"><div><label for="f-from">From</label><input type="date" id="f-from"></div><div><label for="f-to">To</label><input type="date" id="f-to"></div></div>
+  <div id="f-campw"><label for="f-camp">Campaign</label><select id="f-camp"></select></div>
+  <div><label for="f-st" id="f-stl">Status</label><select id="f-st"></select></div>
+  <div><label for="f-q">Search</label><input id="f-q" placeholder="Search..." autocomplete="off"></div>
+  <div class="fbtns"><button class="sec" id="f-reset">Reset</button><button class="sec" id="f-csv">⬇ CSV</button></div>
+ </div>
+ <div class="tiles" id="tiles"></div>
+ <div class="tw rtw"><table class="rt"><thead id="rh"></thead><tbody id="rb"></tbody></table></div>
+ <button id="more" class="sec hidden">Show more</button>
+ <p class="sub" id="rcount" style="margin:10px 0 0"></p>
  <button id="lo" class="out">Logout</button>
 </div></div>
 <p class="sub" style="margin-top:6px">Need a new referral link? <a class="dash-link" href="/gen">Generate Link</a></p>

@@ -23,7 +23,8 @@
   <button class="tile t-e" data-go="analytics"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span>Analytics &amp; Reports</span></button>
   <button class="tile t-v" data-go="campaigns"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v5"/></svg><span>All Campaigns</span></button>
   <button class="tile t-v" data-go="form" data-new="1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Add New Campaign</span></button>
-  <button class="tile t-v" data-go="conv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span>Conversion Report</span></button>
+  <button class="tile t-v" data-go="conv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span>Reports</span></button>
+  <button class="tile t-v" data-go="db"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg><span>Database</span></button>
   <button class="tile t-g" data-go="links"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg><span>Referral Links</span></button>
   <button class="tile t-g" data-go="pay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 3h9l3 5-9 13L2 8Z"/><path d="M2 8h18"/></svg><span>Payments</span></button>
   <button class="tile t-r" data-go="log"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9.5 9.5c0-1 1.1-1.5 2.5-1.5s2.5.6 2.5 1.7-1.1 1.4-2.5 1.8-2.5.7-2.5 1.8 1.1 1.7 2.5 1.7 2.5-.5 2.5-1.5"/></svg><span>Payment Log</span></button>
@@ -84,12 +85,30 @@
   <button id="f-save">Add Campaign</button><button class="sec hidden" id="f-cancel">Cancel editing</button><p id="f-msg" class="msg"></p></div>
 </div></div>
 
-<!-- CONVERSIONS -->
+<!-- REPORTS: conversions + clicks -->
 <div id="screen-conv" class="screen"><div class="wrap" style="max-width:980px">
- <div class="screen-head"><button class="back" data-go="dashboard">←</button><h1>Conversion Report</h1></div>
- <div class="card z-v"><div class="flex2"><div><label style="margin-top:0">Date Filter</label><select id="c-date"><option value="ALL">All Time</option><option value="TODAY">Today</option><option value="YESTERDAY">Yesterday</option></select></div><div><button class="sec" id="c-csv" style="margin-top:0">📥 Export CSV</button></div></div>
-  <input class="search" id="c-q" placeholder="Search by Name, UPI, Click ID, Campaign..." style="margin-top:14px">
-  <div class="tw"><table><thead><tr><th>User / UPI</th><th>Campaign / Goal</th><th>Click ID</th><th>Final</th><th>Date &amp; Time</th></tr></thead><tbody id="c-body"></tbody></table></div></div>
+ <div class="screen-head"><button class="back" data-go="dashboard">←</button><h1>Reports</h1></div>
+ <div class="card z-v">
+  <div class="rtabs"><button type="button" class="sec on" id="rt-conv">Conversion Report</button><button type="button" class="sec" id="rt-clk">Click Report</button></div>
+  <div class="flex2"><div><label style="margin-top:0">Date Filter</label><select id="c-date"><option value="ALL">All Time</option><option value="TODAY">Today</option><option value="YESTERDAY">Yesterday</option><option value="7D">Last 7 Days</option></select></div><div><button class="sec" id="c-csv" style="margin-top:0">📥 Export CSV</button></div></div>
+  <input class="search" id="c-q" placeholder="Search by Name, UPI, Mobile, Click ID, Campaign..." style="margin-top:14px">
+  <p class="note" id="r-sum" style="margin:0 0 10px"></p>
+  <div class="tw" id="r-conv"><table><thead><tr><th>Date &amp; Time</th><th>User / UPI</th><th>Campaign / Goal</th><th>Advertiser Click ID</th><th>System Click ID</th><th>Final</th></tr></thead><tbody id="c-body"></tbody></table></div>
+  <div class="tw hidden" id="r-clk"><table><thead><tr><th>Date &amp; Time</th><th>User / UPI</th><th>Campaign</th><th>System Click ID</th><th>Partner</th><th>Device / IP</th><th>Converted</th></tr></thead><tbody id="k-body"></tbody></table></div>
+ </div>
+</div></div>
+
+<!-- DATABASE (read-only) -->
+<div id="screen-db" class="screen"><div class="wrap" style="max-width:1100px">
+ <div class="screen-head"><button class="back" data-go="dashboard">←</button><h1>Database</h1></div>
+ <div class="card z-v">
+  <div class="rtabs" id="db-tabs"></div>
+  <input class="search" id="db-q" placeholder="Search in this table...">
+  <p class="note" id="db-sum" style="margin:0 0 10px"></p>
+  <div class="tw"><table><thead id="db-head"></thead><tbody id="db-body"></tbody></table></div>
+  <div class="flex2" style="margin-top:14px;align-items:center;justify-content:space-between"><div style="flex:0 0 auto;min-width:0"><button class="sec" id="db-prev" style="margin:0">← Prev</button></div><span class="small" id="db-pg"></span><div style="flex:0 0 auto;min-width:0"><button class="sec" id="db-next" style="margin:0">Next →</button></div></div>
+  <p class="note" style="margin-top:12px">Read-only view of the database.</p>
+ </div>
 </div></div>
 
 <!-- LINKS -->

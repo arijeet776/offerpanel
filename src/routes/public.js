@@ -97,28 +97,38 @@ router.get('/campaigns/active', ah(async (req, res) => {
   res.json({ success: true, campaigns: rows });
 }));
 
-async function findOrCreateReferrer(upi, name) {
+async function findOrCreateReferrer(upi, mobile) {
   const find = async () => (await sb.from('referrers').select('*').ilike('upi', U.likeEscape(upi)).maybeSingle()).data;
   let r = await find();
-  if (r) return r;
-  const { error } = await sb.from('referrers').insert({ ref_id: U.genId('REF'), name, upi, status: 'ACTIVE' });
-  if (error && error.code !== '23505') throw error;
-  return find();
+  if (!r) {
+    const { error } = await sb.from('referrers').insert({ ref_id: U.genId('REF'), upi, mobile, status: 'ACTIVE' });
+    if (error && error.code !== '23505') throw error;
+    r = await find();
+  }
+  // An account made before mobile numbers were collected gets the first valid mobile number given for it.
+  if (r && !U.normMobile(r.mobile)) {
+    const { error } = await sb.from('referrers').update({ mobile }).eq('ref_id', r.ref_id);
+    if (error) throw error;
+    r.mobile = mobile;
+  }
+  return r;
 }
 
 router.post('/links/generate', rateLimit(30, 10 * 60e3), ah(async (req, res) => {
   const b = req.body || {};
   const upi = U.clean(b.upi).toLowerCase();
-  const name = U.clean(b.name);
-  if (!upi || !name || !b.campaignId) throw new HttpError(400, 'Please fill UPI, Name, and select a campaign.');
+  if (!upi || !U.clean(b.mobile) || !b.campaignId) throw new HttpError(400, 'Please fill UPI, Mobile Number, and select a campaign.');
   if (!U.isValidUpi(upi)) throw new HttpError(400, 'Please enter a valid UPI ID.');
+  const mobile = U.normMobile(b.mobile);
+  if (!mobile) throw new HttpError(400, 'Please enter a valid 10-digit Mobile Number.');
 
   const c = await getCampaign(U.clean(b.campaignId));
   if (!c) throw new HttpError(404, 'Campaign not found.');
   if (String(c.status).toUpperCase() !== 'ACTIVE') throw new HttpError(400, 'Campaign is currently paused or inactive.');
 
-  const ref = await findOrCreateReferrer(upi, name);
+  const ref = await findOrCreateReferrer(upi, mobile);
   if (!ref || String(ref.status).toUpperCase() !== 'ACTIVE') throw new HttpError(403, 'This UPI is not active for referrals.');
+  if (U.normMobile(ref.mobile) !== mobile) throw new HttpError(403, 'This UPI is registered with a different Mobile Number. Please enter the Mobile Number you used before.');
 
   const { data: existing } = await sb.from('generated_links').select('*')
     .eq('ref_id', ref.ref_id).eq('campaign_id', c.campaign_id).eq('links_status', 'ACTIVE').order('created_at');
@@ -155,31 +165,44 @@ function maskUpi(u) {
   return h.slice(0, keep) + '*'.repeat(Math.max(2, h.length - keep - tail)) + (tail ? h.slice(-tail) : '') + bank;
 }
 
-// Name AND UPI must both match.
+// Mobile Number AND UPI must both match.
 async function authPartner(body) {
-  const name = U.clean(body && body.name);
   const upi = U.clean(body && body.upi);
-  if (!name || !upi) throw new HttpError(400, 'Please enter both your Registered Name and UPI ID.');
-  const { data: ref } = await sb.from('referrers').select('ref_id,name,upi,status').ilike('upi', U.likeEscape(upi)).maybeSingle();
-  if (!ref || U.normName(ref.name) !== U.normName(name) || String(ref.status).toUpperCase() !== 'ACTIVE')
-    throw new HttpError(401, 'No referral account found. Please check your Name and UPI.');
+  if (!upi || !U.clean(body && body.mobile)) throw new HttpError(400, 'Please enter both your Mobile Number and UPI ID.');
+  const mobile = U.normMobile(body.mobile);
+  if (!mobile) throw new HttpError(400, 'Please enter a valid 10-digit Mobile Number.');
+  const { data: ref } = await sb.from('referrers').select('ref_id,name,upi,mobile,status').ilike('upi', U.likeEscape(upi)).maybeSingle();
+  if (!ref || String(ref.status).toUpperCase() !== 'ACTIVE') throw new HttpError(401, 'No referral account found. Please check your Mobile Number and UPI.');
+  const stored = U.normMobile(ref.mobile);
+  if (!stored) { // account made before mobile numbers were collected: the first login saves the mobile number
+    const { error } = await sb.from('referrers').update({ mobile }).eq('ref_id', ref.ref_id);
+    if (error) throw error;
+    ref.mobile = mobile;
+  } else if (stored !== mobile) throw new HttpError(401, 'No referral account found. Please check your Mobile Number and UPI.');
   return ref;
 }
 
 router.post('/partner/login', rateLimit(15, 10 * 60e3), ah(async (req, res) => {
   const ref = await authPartner(req.body);
 
-  const [links, leads, clicks, camps, ledger, wds] = await Promise.all([
+  const [links, leads, clicks, camps, ledger, wds, pays] = await Promise.all([
     fetchAll('generated_links', 'campaign_id,campaign_name,generated_link,user_payout,referrer_margin', q => q.eq('ref_id', ref.ref_id).order('created_at')),
-    fetchAll('conversions', 'id,created_at,upi,campaign_id,ref_status,ref_payout,events,goal,goal2,goal3,goal_at,goal2_at,goal3_at',
+    fetchAll('conversions', 'id,created_at,click_id,upi,campaign,campaign_id,ref_status,ref_payout,user_status,user_payout,events,goal,goal2,goal3,goal_at,goal2_at,goal3_at',
       q => q.eq('ref_id', ref.ref_id).order('created_at', { ascending: false }).order('id')),
-    fetchAll('clicks', 'campaign_id', q => q.eq('ref_id', ref.ref_id).order('click_id')),
+    fetchAll('clicks', 'click_id,campaign_id,mobile', q => q.eq('ref_id', ref.ref_id).order('click_id')),
     fetchAll('campaigns', 'campaign_id,campaign_name,instructions', q => q.eq('status', 'ACTIVE')),
     fetchAll('wallet_ledger', 'id,created_at,entry_type,reason,amount,campaign_name,note', q => q.eq('ref_id', ref.ref_id).order('id', { ascending: false })),
-    fetchAll('withdrawals', 'withdrawal_id,created_at,amount,status,txn_id,admin_note,processed_at', q => q.eq('ref_id', ref.ref_id).order('created_at', { ascending: false }))
+    fetchAll('withdrawals', 'withdrawal_id,created_at,amount,status,txn_id,admin_note,processed_at', q => q.eq('ref_id', ref.ref_id).order('created_at', { ascending: false })),
+    // cashback the admin has paid out to the users who came through this partner's links
+    fetchAll('payments', 'conversion_id,amount,created_at', q => q.eq('ref_id', ref.ref_id).eq('pay_type', 'USER').order('created_at', { ascending: false }))
   ]);
-  const clickMap = {};
-  clicks.forEach(c => { clickMap[c.campaign_id] = (clickMap[c.campaign_id] || 0) + 1; });
+  const clickMap = {}, mobileOf = {};
+  clicks.forEach(c => { clickMap[c.campaign_id] = (clickMap[c.campaign_id] || 0) + 1; if (c.mobile) mobileOf[c.click_id] = c.mobile; });
+  const paidBy = {}, paidAt = {};
+  pays.forEach(p => {
+    paidBy[p.conversion_id] = (paidBy[p.conversion_id] || 0) + (Number(p.amount) || 0);
+    if (!paidAt[p.conversion_id] || p.created_at > paidAt[p.conversion_id]) paidAt[p.conversion_id] = p.created_at;
+  });
 
   const sum = (rows, f) => rows.filter(f).reduce((s, r) => s + (Number(r.amount) || 0), 0);
   const wallet = {
@@ -192,16 +215,21 @@ router.post('/partner/login', rateLimit(15, 10 * 60e3), ah(async (req, res) => {
 
   res.json({
     success: true,
-    referrer: { ref_id: ref.ref_id, name: ref.name, upi: ref.upi },
+    referrer: { ref_id: ref.ref_id, mobile: U.maskMobile(ref.mobile), upi: ref.upi },
     campaigns: camps,
     links: links.map(l => ({ ...l, clicks: clickMap[l.campaign_id] || 0 })),
+    // Everything about the referred user is masked here, so the partner never sees a full number or UPI.
     leads: leads.map(l => ({
-      id: l.id, created_at: l.created_at, campaign_id: l.campaign_id, upi: maskUpi(l.upi), ref_status: l.ref_status, ref_payout: l.ref_payout,
+      id: l.id, created_at: l.created_at, campaign_id: l.campaign_id, campaign: l.campaign || l.campaign_id,
+      mobile: U.maskMobile(mobileOf[l.click_id]), upi: maskUpi(l.upi),
+      ref_status: l.ref_status, ref_payout: Number(l.ref_payout) || 0,
+      user_status: l.user_status, user_payout: Number(l.user_payout) || 0, paid: paidBy[l.id] || 0, paid_at: paidAt[l.id] || null,
       events: U.convEvents(l).map(e => ({ name: e.name, at: e.at }))
     })),
     wallet,
-    history: ledger.slice(0, 30),
-    withdrawals: wds.slice(0, 20)
+    disbursed: Object.values(paidBy).reduce((t, n) => t + n, 0),
+    history: ledger.slice(0, 1000),
+    withdrawals: wds.slice(0, 1000)
   });
 }));
 

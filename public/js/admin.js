@@ -1,4 +1,4 @@
-const S = { token: sessionStorage.getItem('qx_token') || '', D: { campaigns: [], links: [], conversions: [], payments: [], withdrawals: [] }, editId: null, ctx: null, charts: {} };
+const S = { token: sessionStorage.getItem('qx_token') || '', D: { campaigns: [], links: [], conversions: [], payments: [], withdrawals: [] }, editId: null, ctx: null, charts: {}, rep: { tab: 'conv', clicks: null, total: 0, loading: false, err: '' } };
 const DONE = ['PAID', 'REJECTED', 'NA', 'CREDITED'];
 
 async function call(path, opts = {}) {
@@ -39,12 +39,13 @@ function go(name) {
   $('screen-' + name).classList.add('active'); window.scrollTo(0, 0);
   if (name === 'campaigns') renderCampaigns();
   if (name === 'analytics') loadAnalytics();
-  if (name === 'conv') renderConv();
+  if (name === 'conv') { if (S.rep.tab === 'clk') loadClicks(); else renderConv(); }
   if (name === 'links') { fillSelect('l-camp', true); renderLinks(); }
   if (name === 'pay') { fillSelect('p-camp', true); renderPay(); }
   if (name === 'log') renderLog();
   if (name === 'wd') renderWd();
   if (name === 'sheets') loadSheets();
+  if (name === 'db') loadDb(true);
 }
 document.addEventListener('click', e => {
   const g = e.target.closest('[data-go]');
@@ -171,26 +172,114 @@ $('f-save').addEventListener('click', async () => {
   $('f-save').disabled = false;
 });
 
-// ---------- Conversion report ----------
-function convRows() {
-  const q = $('c-q').value, d = $('c-date').value;
-  const today = dayKey(Date.now()), yest = dayKey(Date.now() - 864e5);
-  return S.D.conversions.filter(c => matchQ(q, c.upi, c.name, c.campaign, c.click_id, c.network_click_id) && (d === 'ALL' || (d === 'TODAY' ? dayKey(c.created_at) === today : dayKey(c.created_at) === yest)));
-}
+// ---------- Reports: conversions + clicks ----------
+const inRange = (t, d) => {
+  if (d === 'ALL') return true;
+  if (d === 'TODAY') return dayKey(t) === dayKey(Date.now());
+  if (d === 'YESTERDAY') return dayKey(t) === dayKey(Date.now() - 864e5);
+  if (d === '7D') return new Date(t).getTime() >= Date.now() - 7 * 864e5;
+  return true;
+};
+const userCell = (name, upi, mobile, gmail) =>
+  (name ? '<b>' + esc(name) + '</b><br><span class="mono">' + esc(upi) + '</span>' : '<b class="mono">' + esc(upi || '—') + '</b>') +
+  (mobile ? '<br><span class="small">📱 ' + esc(mobile) + '</span>' : '') + (gmail ? '<br><span class="small">✉ ' + esc(gmail) + '</span>' : '');
 const goalOf = c => (c.events || []).map(e => e.name).join(' + ') || 'INSTALL';
 const finalOf = c => { const f = String(c.final_status || '').toUpperCase(); return ['SUCCESSFUL', 'APPROVED'].includes(f) ? 'SUCCESSFUL' : f.includes('REJECT') ? 'REJECTED' : 'PENDING'; };
-function renderConv() {
-  const r = convRows();
-  $('c-body').innerHTML = r.length ? r.map(c => '<tr><td><b>' + esc(c.name || 'No name') + '</b><br><span class="mono">' + esc(c.upi) + '</span></td><td><b>' + esc(c.campaign) + '</b><br><span style="color:var(--gold);font-size:11.5px">' + esc(goalOf(c)) +
-    '</span></td><td><span class="mono">' + esc(c.click_id) + '</span></td><td><span class="badge ' + statusClass(finalOf(c)) + '">' + finalOf(c) + '</span></td><td class="mono">' + esc(fmtDate(c.created_at)) + '</td></tr>').join('')
-    : '<tr><td colspan="5" class="empty">No matching conversion logs.</td></tr>';
+
+function convRows() {
+  const q = $('c-q').value, d = $('c-date').value;
+  return S.D.conversions.filter(c => matchQ(q, c.upi, c.name, c.mobile, c.gmail, c.campaign, c.click_id, c.network_click_id, c.ref_id, c.ref_mobile) && inRange(c.created_at, d));
 }
+function clickRows() {
+  const q = $('c-q').value, d = $('c-date').value;
+  return (S.rep.clicks || []).filter(k => matchQ(q, k.upi, k.name, k.mobile, k.gmail, k.campaign, k.campaign_id, k.click_id, k.network_click_id, k.ref_id, k.ref_label, k.ip_address) && inRange(k.created_at, d));
+}
+
+function renderConv() {
+  const conv = S.rep.tab === 'conv';
+  $('rt-conv').classList.toggle('on', conv); $('rt-clk').classList.toggle('on', !conv);
+  $('r-conv').classList.toggle('hidden', !conv); $('r-clk').classList.toggle('hidden', conv);
+  $('c-q').placeholder = conv ? 'Search by Name, UPI, Mobile, Click ID, Campaign...' : 'Search by Name, UPI, Mobile, Click ID, Campaign, Partner...';
+  if (conv) renderConvTable(); else renderClickTable();
+}
+
+// Date & Time | User / UPI | Campaign / Goal | Advertiser Click ID | System Click ID | Final
+function renderConvTable() {
+  const r = convRows();
+  $('r-sum').textContent = r.length + ' of ' + S.D.conversions.length + ' conversions';
+  $('c-body').innerHTML = r.length ? r.map(c => '<tr><td class="mono" style="white-space:nowrap">' + esc(fmtDate(c.created_at)) + '</td><td>' + userCell(c.name, c.upi, c.mobile, c.gmail) +
+    '</td><td><b>' + esc(c.campaign) + '</b><br><span style="color:var(--gold);font-size:11.5px">' + esc(goalOf(c)) + '</span></td><td><span class="mono">' + esc(c.network_click_id || '—') +
+    '</span></td><td><span class="mono">' + esc(c.click_id) + '</span></td><td><span class="badge ' + statusClass(finalOf(c)) + '">' + finalOf(c) + '</span></td></tr>').join('')
+    : '<tr><td colspan="6" class="empty">No matching conversion logs.</td></tr>';
+}
+
+// Date & Time | User / UPI | Campaign | System Click ID | Partner | Device / IP | Converted
+function renderClickTable() {
+  if (S.rep.clicks === null) {
+    $('r-sum').textContent = S.rep.loading ? 'Loading clicks...' : '';
+    $('k-body').innerHTML = '<tr><td colspan="7" class="empty">' + esc(S.rep.loading ? 'Loading...' : (S.rep.err || 'Could not load clicks.')) + '</td></tr>';
+    return;
+  }
+  const r = clickRows(), conv = r.filter(k => k.converted).length;
+  $('r-sum').textContent = r.length + ' clicks • ' + conv + ' converted' + (S.rep.total > S.rep.clicks.length ? ' • showing latest ' + S.rep.clicks.length + ' of ' + S.rep.total : '');
+  $('k-body').innerHTML = r.length ? r.map(k => '<tr><td class="mono" style="white-space:nowrap">' + esc(fmtDate(k.created_at)) + '</td><td>' + userCell(k.name, k.upi, k.mobile, k.gmail) +
+    '</td><td><b>' + esc(k.campaign) + '</b></td><td><span class="mono">' + esc(k.click_id) + '</span></td><td>' +
+    (!k.ref_id || k.ref_id === 'DIRECT' ? '<span class="mono">Direct</span>' : '<b>' + esc(k.ref_label || k.ref_id) + '</b><br><span class="mono small">' + esc(k.ref_id) + '</span>') +
+    '</td><td>' + esc(k.device_type || '—') + '<br><span class="mono small">' + esc(k.ip_address || '') + '</span></td><td>' +
+    (k.converted ? '<span class="badge ok">YES</span>' + (k.network_click_id ? '<br><span class="mono small">' + esc(k.network_click_id) + '</span>' : '') : '<span class="badge wait">NO</span>') + '</td></tr>').join('')
+    : '<tr><td colspan="7" class="empty">No matching clicks.</td></tr>';
+}
+
+async function loadClicks() {
+  if (S.rep.loading) return;
+  S.rep.loading = true; S.rep.clicks = null; S.rep.err = ''; renderConv();
+  try { const r = await call('/reports/clicks'); S.rep.clicks = r.clicks; S.rep.total = r.total; }
+  catch (e) { S.rep.clicks = null; S.rep.err = e.message; }
+  S.rep.loading = false; renderConv();
+}
+$('rt-conv').addEventListener('click', () => { S.rep.tab = 'conv'; renderConv(); });
+$('rt-clk').addEventListener('click', () => { S.rep.tab = 'clk'; loadClicks(); });
 $('c-q').addEventListener('input', renderConv); $('c-date').addEventListener('change', renderConv);
 $('c-csv').addEventListener('click', () => {
-  const r = convRows(); if (!r.length) return alert('No conversion data available to export.');
-  const head = ['Name', 'UPI', 'Campaign', 'Goal', 'Click ID', 'Final Status', 'Date'];
-  download('Conversion_Report_' + Date.now() + '.csv', [head, ...r.map(c => [c.name, c.upi, c.campaign, goalOf(c), c.click_id, finalOf(c), fmtDate(c.created_at)])].map(x => x.map(csvCell).join(',')).join('\n'));
+  if (S.rep.tab === 'conv') {
+    const r = convRows(); if (!r.length) return alert('No conversion data available to export.');
+    const head = ['Date & Time', 'Name', 'UPI', 'Mobile', 'Gmail', 'Campaign', 'Goal', 'Advertiser Click ID', 'System Click ID', 'Partner Ref ID', 'Final Status'];
+    download('Conversion_Report_' + Date.now() + '.csv', [head, ...r.map(c => [fmtDate(c.created_at), c.name, c.upi, c.mobile, c.gmail, c.campaign, goalOf(c), c.network_click_id, c.click_id, c.ref_id, finalOf(c)])].map(x => x.map(csvCell).join(',')).join('\n'));
+  } else {
+    const r = clickRows(); if (!r.length) return alert('No click data available to export.');
+    const head = ['Date & Time', 'Name', 'UPI', 'Mobile', 'Gmail', 'Campaign', 'System Click ID', 'Partner Ref ID', 'Partner Mobile', 'Device', 'IP Address', 'Converted', 'Advertiser Click ID'];
+    download('Click_Report_' + Date.now() + '.csv', [head, ...r.map(k => [fmtDate(k.created_at), k.name, k.upi, k.mobile, k.gmail, k.campaign, k.click_id, k.ref_id, k.ref_label, k.device_type, k.ip_address, k.converted ? 'YES' : 'NO', k.network_click_id])].map(x => x.map(csvCell).join(',')).join('\n'));
+  }
 });
+
+// ---------- Database viewer ----------
+const DB = { tables: [], tab: 'clicks', page: 1, pages: 1, busy: false };
+async function loadDb(first) {
+  if (DB.busy) return; DB.busy = true;
+  try {
+    if (first || !DB.tables.length) { const t = await call('/db/tables'); DB.tables = t.tables; DB.page = 1; }
+    $('db-tabs').innerHTML = DB.tables.map(t => '<button type="button" class="sec' + (t.key === DB.tab ? ' on' : '') + '" data-db="' + esc(t.key) + '">' + esc(t.label) + ' (' + t.count + ')</button>').join('');
+    $('db-sum').textContent = 'Loading...';
+    const r = await call('/db/' + DB.tab + '?page=' + DB.page + '&q=' + encodeURIComponent($('db-q').value.trim()));
+    DB.pages = r.pages;
+    $('db-sum').textContent = r.count + ' record' + (r.count === 1 ? '' : 's') + (r.count > r.rows.length ? ' • showing ' + r.rows.length + ' on this page' : '');
+    $('db-pg').textContent = 'Page ' + r.page + ' of ' + r.pages;
+    $('db-prev').disabled = r.page <= 1; $('db-next').disabled = r.page >= r.pages;
+    $('db-head').innerHTML = r.columns.length ? '<tr>' + r.columns.map(c => '<th>' + esc(c.replace(/_/g, ' ')) + '</th>').join('') + '</tr>' : '';
+    const cell = (k, v) => {
+      if (v == null || v === '') return '<span style="opacity:.4">—</span>';
+      if (typeof v === 'object') v = JSON.stringify(v);
+      if (/_at$/.test(k) && !isNaN(Date.parse(v))) return '<span style="white-space:nowrap">' + esc(fmtDate(v)) + '</span>';
+      const t = String(v); return '<span class="mono" title="' + esc(t) + '">' + esc(t.length > 48 ? t.slice(0, 48) + '…' : t) + '</span>';
+    };
+    $('db-body').innerHTML = r.rows.length ? r.rows.map(row => '<tr>' + r.columns.map(c => '<td>' + cell(c, row[c]) + '</td>').join('') + '</tr>').join('') : '<tr><td class="empty">No records found.</td></tr>';
+  } catch (e) { $('db-sum').textContent = e.message; }
+  DB.busy = false;
+}
+$('db-tabs').addEventListener('click', e => { const b = e.target.closest('[data-db]'); if (!b) return; DB.tab = b.dataset.db; DB.page = 1; $('db-q').value = ''; loadDb(); });
+$('db-prev').addEventListener('click', () => { if (DB.page > 1) { DB.page--; loadDb(); } });
+$('db-next').addEventListener('click', () => { if (DB.page < DB.pages) { DB.page++; loadDb(); } });
+let dbT; $('db-q').addEventListener('input', () => { clearTimeout(dbT); dbT = setTimeout(() => { DB.page = 1; loadDb(); }, 400); });
 
 // ---------- Referral links ----------
 function renderLinks() {
@@ -200,7 +289,7 @@ function renderLinks() {
   $('l-body').innerHTML = rows.length ? rows.map(l => {
     const cv = S.D.conversions.filter(c => c.ref_id === l.ref_id && c.campaign_id === id);
     const earned = cv.filter(c => String(c.ref_status).toUpperCase() !== 'REJECTED').reduce((s, c) => s + (Number(c.ref_payout) || 0), 0);
-    return '<tr><td><b>' + esc(l.ref_name || 'Unknown') + '</b><br><span class="mono">' + esc(l.upi) + '</span></td><td class="small" style="word-break:break-all;max-width:250px;color:var(--violet)"><a href="' + esc(l.generated_link) + '" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">' + esc(l.generated_link) +
+    return '<tr><td><b>' + esc(l.ref_name || l.ref_mobile || 'Unknown') + '</b><br><span class="mono">' + esc(l.upi) + '</span>' + (l.ref_name && l.ref_mobile ? '<br><span class="small">📱 ' + esc(l.ref_mobile) + '</span>' : '') + '</td><td class="small" style="word-break:break-all;max-width:250px;color:var(--violet)"><a href="' + esc(l.generated_link) + '" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">' + esc(l.generated_link) +
       '</a></td><td class="small">' + esc(fmtDate(l.created_at)) + '</td><td style="text-align:center;color:var(--emerald);font-weight:700">' + cv.length + '</td><td class="amt">' + inr(earned) + '</td></tr>';
   }).join('') : '<tr><td colspan="5" class="empty">No links generated for this campaign yet.</td></tr>';
 }
@@ -224,15 +313,15 @@ function partyCell(c, party) {
 function renderPay() {
   const id = $('p-camp').value, q = $('p-q').value;
   if (!id) { $('p-body').innerHTML = '<tr><td colspan="5" class="empty">Select a campaign above.</td></tr>'; return; }
-  const rows = S.D.conversions.filter(c => c.campaign_id === id && !(DONE.includes(String(c.user_status).toUpperCase()) && DONE.includes(String(c.ref_status).toUpperCase())) && matchQ(q, c.name, c.upi, c.ref_name, c.ref_upi));
-  $('p-body').innerHTML = rows.length ? rows.map(c => '<tr><td><b>' + esc(c.name || 'No name') + '</b><br><span class="mono">' + esc(c.upi) + '</span></td><td>' + (c.ref_id === 'DIRECT' ? '<span class="mono">Direct</span>' : '<b>' + esc(c.ref_name || 'Referrer') + '</b><br><span class="mono">' + esc(c.ref_upi) + '</span>') +
+  const rows = S.D.conversions.filter(c => c.campaign_id === id && !(DONE.includes(String(c.user_status).toUpperCase()) && DONE.includes(String(c.ref_status).toUpperCase())) && matchQ(q, c.name, c.upi, c.mobile, c.ref_name, c.ref_mobile, c.ref_upi));
+  $('p-body').innerHTML = rows.length ? rows.map(c => '<tr><td>' + userCell(c.name, c.upi, c.mobile, '') + '</td><td>' + (c.ref_id === 'DIRECT' ? '<span class="mono">Direct</span>' : '<b>' + esc(c.ref_name || c.ref_mobile || 'Referrer') + '</b><br><span class="mono">' + esc(c.ref_upi) + '</span>') +
     '</td><td><span class="badge ' + statusClass(finalOf(c)) + '">' + finalOf(c) + '</span></td><td>' + partyCell(c, 'USER') + '</td><td>' + partyCell(c, 'REFERRER') + '</td></tr>').join('')
     : '<tr><td colspan="5" class="empty">No pending payment entries for this campaign.</td></tr>';
 }
 $('p-camp').addEventListener('change', renderPay); $('p-q').addEventListener('input', renderPay);
 
 function convById(id) { return S.D.conversions.find(c => String(c.id) === String(id)); }
-function payee(c, party) { return party === 'USER' ? { name: c.name || 'No name', upi: c.upi, amt: dueOf(c) } : { name: c.ref_name, upi: c.ref_upi, amt: c.ref_payout }; }
+function payee(c, party) { return party === 'USER' ? { name: c.name || 'No name', upi: c.upi, amt: dueOf(c) } : { name: c.ref_name || c.ref_mobile, upi: c.ref_upi, amt: c.ref_payout }; }
 function openPay(id, party) {
   const c = convById(id); if (!c) return; const p = payee(c, party);
   if (finalOf(c) !== 'SUCCESSFUL' && !confirm('Final status is ' + finalOf(c) + ' ). Pay anyway?')) return;
@@ -324,20 +413,20 @@ function renderWd() {
     const st = String(w.status).toUpperCase();
     const act = st === 'PENDING' ? '<div class="acts"><button class="mini ok" data-act="wdpay" data-id="' + esc(w.withdrawal_id) + '">Pay</button><button class="mini danger" data-act="wdrej" data-id="' + esc(w.withdrawal_id) + '">Reject</button></div>'
       : '<div class="small">' + (w.txn_id ? 'Txn: <span class="mono">' + esc(w.txn_id) + '</span>' : '') + (w.admin_note ? '<br>' + esc(w.admin_note) : '') + '</div>';
-    return '<tr><td><b>' + esc(w.ref_name || w.name) + '</b><br><span class="mono">' + esc(w.upi) + '</span></td><td class="amt">' + inr(w.amount) + '</td><td class="small">' + esc(fmtDate(w.created_at)) + '</td><td><span class="badge ' + statusClass(st) + '">' + esc(st) + '</span></td><td>' + act + '</td></tr>';
+    return '<tr><td><b>' + esc(w.ref_name || w.ref_mobile || w.name) + '</b><br><span class="mono">' + esc(w.upi) + '</span>' + (w.ref_name && w.ref_mobile ? '<br><span class="small">📱 ' + esc(w.ref_mobile) + '</span>' : '') + '</td><td class="amt">' + inr(w.amount) + '</td><td class="small">' + esc(fmtDate(w.created_at)) + '</td><td><span class="badge ' + statusClass(st) + '">' + esc(st) + '</span></td><td>' + act + '</td></tr>';
   }).join('') : '<tr><td colspan="5" class="empty">No withdrawal requests here.</td></tr>';
 }
 $('wd-f').addEventListener('change', renderWd);
 function openWdPay(id) {
   const w = wdById(id); if (!w) return;
   S.ctx = { id, kind: 'wd' };
-  $('mp-title').textContent = 'Pay withdrawal — ' + (w.ref_name || w.name); $('mp-owed').textContent = 'Send ' + inr(w.amount) + ' to UPI: ' + w.upi;
+  $('mp-title').textContent = 'Pay withdrawal — ' + (w.ref_name || w.ref_mobile || w.name); $('mp-owed').textContent = 'Send ' + inr(w.amount) + ' to UPI: ' + w.upi;
   $('mp-amt').value = Number(w.amount) || ''; $('mp-txn').value = ''; $('mp-note').value = ''; $('mp-msg').textContent = ''; $('m-pay').classList.add('show');
 }
 function openWdRej(id) {
   const w = wdById(id); if (!w) return;
   S.ctx = { id, kind: 'wd' };
-  $('mr-title').textContent = 'Reject withdrawal — ' + (w.ref_name || w.name); $('mr-owed').textContent = inr(w.amount) + ' will go back into their wallet.'; $('mr-note').value = ''; $('mr-msg').textContent = ''; $('m-rej').classList.add('show');
+  $('mr-title').textContent = 'Reject withdrawal — ' + (w.ref_name || w.ref_mobile || w.name); $('mr-owed').textContent = inr(w.amount) + ' will go back into their wallet.'; $('mr-note').value = ''; $('mr-msg').textContent = ''; $('m-rej').classList.add('show');
 }
 
 // ---------- Send to Sheets ----------
