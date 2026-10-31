@@ -26,6 +26,22 @@ function fieldsOf(c) {
   return list(c.collect_fields).filter(f => ['NAME', 'MOBILE', 'GMAIL'].includes(f));
 }
 
+// Google reCAPTCHA (v2 checkbox). Skipped while RECAPTCHA_SECRET is not set; once it is set, every offer-page submit needs a valid tick.
+async function verifyCaptcha(token, ip) {
+  const secret = process.env.RECAPTCHA_SECRET;
+  if (!secret) return;
+  if (!token) throw new HttpError(400, 'Please tick "I\'m not a robot" first.');
+  let ok = false;
+  try {
+    const r = await fetch('https://www.google.com/recaptcha/api/siteverify', {
+      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ secret, response: String(token).slice(0, 4096), remoteip: ip || '' }), signal: AbortSignal.timeout(8000)
+    });
+    ok = !!(await r.json()).success;
+  } catch (e) { console.error('[captcha] could not reach Google:', e.message); throw new HttpError(503, 'Could not verify you right now. Please try again in a moment.'); }
+  if (!ok) throw new HttpError(400, 'Verification failed. Please tick "I\'m not a robot" again.');
+}
+
 router.get('/campaign-info', ah(async (req, res) => {
   const ref = U.clean(req.query.ref).toUpperCase() || 'DIRECT';
   const c = await getCampaign(U.clean(req.query.cid));
@@ -37,7 +53,8 @@ router.get('/campaign-info', ah(async (req, res) => {
     status: String(c.status || 'ACTIVE').toUpperCase(),
     userPayout: await U.userPayoutFor(sb, c, ref),
     notes: c.notes || '',
-    fields: fieldsOf(c)
+    fields: fieldsOf(c),
+    captchaSiteKey: process.env.RECAPTCHA_SITE_KEY || ''
   });
 }));
 
@@ -57,6 +74,7 @@ router.post('/prelander', rateLimit(30, 10 * 60e3), ah(async (req, res) => {
   const cid = c.campaign_id;
   if (String(c.status).toUpperCase() !== 'ACTIVE') throw new HttpError(400, 'This offer is currently paused or inactive.');
   if (!c.affiliate_link) throw new HttpError(400, 'Offer link not configured.');
+  await verifyCaptcha(b.captcha, U.clientIp(req));
 
   // The partner id in the link must be a real, active partner; otherwise the visit counts as direct. Partners cannot use their own link.
   if (ref !== 'DIRECT') {
@@ -82,7 +100,7 @@ router.post('/prelander', rateLimit(30, 10 * 60e3), ah(async (req, res) => {
   const ua = String(req.headers['user-agent'] || '');
   const { error } = await sb.from('clicks').insert({
     click_id: clickId, campaign_id: cid, ref_id: ref, name: (req_f.includes('NAME') && name) || null, upi,
-    ip_address: req.ip, device_type: /mobile|android|iphone/i.test(ua) ? 'Mobile' : 'Web',
+    ip_address: U.clientIp(req, true), device_type: /mobile|android|iphone/i.test(ua) ? 'Mobile' : 'Web',
     mobile: (req_f.includes('MOBILE') && mobile) || null, gmail: (req_f.includes('GMAIL') && gmail) || null
   });
   if (error) throw error;
@@ -100,11 +118,12 @@ router.get('/campaigns/active', ah(async (req, res) => {
 async function findOrCreateReferrer(upi, mobile) {
   const find = async () => (await sb.from('referrers').select('*').ilike('upi', U.likeEscape(upi)).maybeSingle()).data;
   let r = await find();
-  if (!r) {
-    const { error } = await sb.from('referrers').insert({ ref_id: U.genId('REF'), upi, mobile, status: 'ACTIVE' });
+  for (let i = 0; !r && i < 6; i++) { // a new ID can (very rarely) clash with an existing one: just draw another
+    const { error } = await sb.from('referrers').insert({ ref_id: U.genRefId(), upi, mobile, status: 'ACTIVE' });
     if (error && error.code !== '23505') throw error;
     r = await find();
   }
+  if (!r) throw new HttpError(503, 'Could not create your referral account. Please try again.');
   // An account made before mobile numbers were collected gets the first valid mobile number given for it.
   if (r && !U.normMobile(r.mobile)) {
     const { error } = await sb.from('referrers').update({ mobile }).eq('ref_id', r.ref_id);
@@ -182,22 +201,44 @@ async function authPartner(body) {
   return ref;
 }
 
+// Clicks per campaign for one partner: counted by the database. Falls back to counting rows if the SQL function is not installed yet.
+async function clicksPerCampaign(refId) {
+  const out = {};
+  const r = await sb.rpc('partner_clicks', { p_ref: refId });
+  if (!r.error) { (r.data || []).forEach(x => { out[x.campaign_id] = Number(x.click_count) || 0; }); return out; }
+  const rows = await fetchAll('clicks', 'click_id,campaign_id', q => q.eq('ref_id', refId).order('click_id'));
+  rows.forEach(c => { out[c.campaign_id] = (out[c.campaign_id] || 0) + 1; });
+  return out;
+}
+// Mobile number of each lead sits on its click row: read only the clicks that belong to the leads being shown.
+async function mobilesFor(clickIds) {
+  const out = {}, ids = [...new Set(clickIds.filter(Boolean))];
+  for (let i = 0; i < ids.length; i += 1000) {
+    const part = ids.slice(i, i + 1000), chunks = [];
+    for (let j = 0; j < part.length; j += 200) chunks.push(part.slice(j, j + 200));
+    const rs = await Promise.all(chunks.map(ch => sb.from('clicks').select('click_id,mobile').in('click_id', ch)));
+    rs.forEach(r => (r.data || []).forEach(k => { if (k.mobile) out[k.click_id] = k.mobile; }));
+  }
+  return out;
+}
+
 router.post('/partner/login', rateLimit(15, 10 * 60e3), ah(async (req, res) => {
   const ref = await authPartner(req.body);
 
-  const [links, leads, clicks, camps, ledger, wds, pays] = await Promise.all([
+  const [links, leads, camps, ledger, wds, pays, archived, clickCounts] = await Promise.all([
     fetchAll('generated_links', 'campaign_id,campaign_name,generated_link,user_payout,referrer_margin', q => q.eq('ref_id', ref.ref_id).order('created_at')),
     fetchAll('conversions', 'id,created_at,click_id,upi,campaign,campaign_id,ref_status,ref_payout,user_status,user_payout,events,goal,goal2,goal3,goal_at,goal2_at,goal3_at',
       q => q.eq('ref_id', ref.ref_id).order('created_at', { ascending: false }).order('id')),
-    fetchAll('clicks', 'click_id,campaign_id,mobile', q => q.eq('ref_id', ref.ref_id).order('click_id')),
     fetchAll('campaigns', 'campaign_id,campaign_name,instructions', q => q.eq('status', 'ACTIVE')),
     fetchAll('wallet_ledger', 'id,created_at,entry_type,reason,amount,campaign_name,note', q => q.eq('ref_id', ref.ref_id).order('id', { ascending: false })),
     fetchAll('withdrawals', 'withdrawal_id,created_at,amount,status,txn_id,admin_note,processed_at', q => q.eq('ref_id', ref.ref_id).order('created_at', { ascending: false })),
     // cashback the admin has paid out to the users who came through this partner's links
-    fetchAll('payments', 'conversion_id,amount,created_at', q => q.eq('ref_id', ref.ref_id).eq('pay_type', 'USER').order('created_at', { ascending: false }))
+    fetchAll('payments', 'conversion_id,amount,created_at', q => q.eq('ref_id', ref.ref_id).eq('pay_type', 'USER').order('created_at', { ascending: false })),
+    // summaries of campaigns the admin deleted (totals only, no user details). Empty until the table exists.
+    fetchAll('campaign_archive', 'campaign_id,campaign_name,clicks,leads,commission,disbursed,deleted_at', q => q.eq('ref_id', ref.ref_id).order('id', { ascending: false })).catch(() => []),
+    clicksPerCampaign(ref.ref_id)
   ]);
-  const clickMap = {}, mobileOf = {};
-  clicks.forEach(c => { clickMap[c.campaign_id] = (clickMap[c.campaign_id] || 0) + 1; if (c.mobile) mobileOf[c.click_id] = c.mobile; });
+  const clickMap = clickCounts, mobileOf = await mobilesFor(leads.map(l => l.click_id));
   const paidBy = {}, paidAt = {};
   pays.forEach(p => {
     paidBy[p.conversion_id] = (paidBy[p.conversion_id] || 0) + (Number(p.amount) || 0);
@@ -228,6 +269,7 @@ router.post('/partner/login', rateLimit(15, 10 * 60e3), ah(async (req, res) => {
     })),
     wallet,
     disbursed: Object.values(paidBy).reduce((t, n) => t + n, 0),
+    archived: archived.map(r => ({ ...r, commission: Number(r.commission) || 0, disbursed: Number(r.disbursed) || 0 })),
     history: ledger.slice(0, 1000),
     withdrawals: wds.slice(0, 1000)
   });
@@ -247,14 +289,14 @@ router.post('/partner/withdraw', rateLimit(10, 10 * 60e3), ah(async (req, res) =
 
 // ---------- Offer status tracker (replaces the old Google Apps Script tracker) ----------
 // A user types the UPI ID they used on the offer page. Every attempt (click) is matched to its lead by the
-// exact click id, so no guessing by dates or spellings. Only non-sensitive progress is returned: no amounts,
-// no mobile / gmail, no wallet data.
+// exact click id, so no guessing by dates or spellings. Only the user's own progress and their own cashback payout
+// are returned: no mobile / gmail, no partner or wallet data.
 async function trackerAttempts(upiRaw, cidRaw, limit) {
   const upi = U.clean(upiRaw).toLowerCase();
   if (!upi || upi.length > 100) throw new HttpError(400, 'Please enter a valid UPI ID.');
   const cid = U.clean(cidRaw).toUpperCase();
 
-  let q = sb.from('clicks').select('click_id,campaign_id,name,created_at').ilike('upi', U.likeEscape(upi));
+  let q = sb.from('clicks').select('click_id,campaign_id,ref_id,name,created_at').eq('upi', upi); // UPIs are stored in lower case
   if (cid) q = q.eq('campaign_id', cid);
   const { data: clicks, error } = await q.order('created_at', { ascending: false }).limit(limit);
   if (error) throw error;
@@ -263,7 +305,7 @@ async function trackerAttempts(upiRaw, cidRaw, limit) {
   const clickIds = clicks.map(c => c.click_id);
   const campIds = [...new Set(clicks.map(c => c.campaign_id))];
   const [convRes, campRes] = await Promise.all([
-    sb.from('conversions').select('click_id,events,goal,goal2,goal3,goal_at,goal2_at,goal3_at,user_status,final_status').in('click_id', clickIds),
+    sb.from('conversions').select('id,click_id,user_payout,events,goal,goal2,goal3,goal_at,goal2_at,goal3_at,user_status,final_status').in('click_id', clickIds),
     sb.from('campaigns').select('*').in('campaign_id', campIds)
   ]);
   if (convRes.error) throw convRes.error;
@@ -271,7 +313,18 @@ async function trackerAttempts(upiRaw, cidRaw, limit) {
   const convBy = Object.fromEntries(convRes.data.map(c => [c.click_id, c]));
   const campBy = Object.fromEntries(campRes.data.map(c => [c.campaign_id, c]));
 
-  return clicks.map(k => {
+  // cashback already paid out to this user, per lead
+  const leadIds = convRes.data.map(c => c.id);
+  const paidBy = {};
+  if (leadIds.length) {
+    const { data: pays, error: pe } = await sb.from('payments').select('conversion_id,amount').eq('pay_type', 'USER').in('conversion_id', leadIds);
+    if (pe) throw pe;
+    (pays || []).forEach(p => { paidBy[p.conversion_id] = (paidBy[p.conversion_id] || 0) + (Number(p.amount) || 0); });
+  }
+  const expected = {}; // payout a user will get before any lead exists (same number the offer page showed)
+  const expectedFor = (camp, ref) => { const k = camp.campaign_id + '|' + (ref || ''); return expected[k] || (expected[k] = U.userPayoutFor(sb, camp, ref)); };
+
+  return Promise.all(clicks.map(async k => {
     const camp = campBy[k.campaign_id];
     const lead = convBy[k.click_id];
     const evs = camp ? U.campEvents(camp) : [];
@@ -291,6 +344,9 @@ async function trackerAttempts(upiRaw, cidRaw, limit) {
     const allDone = evs.length > 0 && evs.every((_, i) => doneNos.has(i + 1));
     const overallStatus = paid ? 'PAID' : rejected ? 'REJECTED' : allDone ? 'SUCCESSFUL' : 'PENDING';
     const last = done.map(e => e.at).filter(Boolean).sort().pop() || null;
+    // what the user earns: the payout once its event arrived, otherwise what the offer page promised
+    const got = lead ? Number(lead.user_payout) || 0 : 0;
+    const amount = got > 0 ? got : camp ? await expectedFor(camp, k.ref_id) : 0;
 
     return {
       name: k.name || 'User',
@@ -299,9 +355,11 @@ async function trackerAttempts(upiRaw, cidRaw, limit) {
       clickAt: k.created_at,
       updatedAt: last,
       overallStatus,
-      goalsList
+      goalsList,
+      // the admin's payment status decides this: PAID -> SUCCESSFUL, otherwise PENDING (or REJECTED)
+      payout: { amount, paid: lead ? paidBy[lead.id] || 0 : 0, status: paid ? 'SUCCESSFUL' : rejected ? 'REJECTED' : 'PENDING' }
     };
-  });
+  }));
 }
 
 router.post('/tracker/status', rateLimit(30, 10 * 60e3), ah(async (req, res) => {

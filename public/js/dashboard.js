@@ -83,7 +83,7 @@ function fillCampaigns() {
 function setStatusOptions() {
   const opts = { ref: ['Cashback Status', ['', 'All'], ['PAID', 'Paid'], ['PENDING', 'Pending'], ['REJECTED', 'Rejected']],
                  wd: ['Status', ['', 'All'], ['PENDING', 'Pending'], ['PAID', 'Paid'], ['REJECTED', 'Rejected']],
-                 led: ['Type', ['', 'All'], ['CREDIT', 'Credits'], ['DEBIT', 'Debits']] }[R.tab];
+                 led: ['Type', ['', 'All'], ['CREDIT', 'Credits'], ['DEBIT', 'Debits']], arc: ['Status', ['', 'All']] }[R.tab];
   $('f-stl').textContent = opts[0];
   const cur = $('f-st').value;
   $('f-st').innerHTML = opts.slice(1).map(o => '<option value="' + o[0] + '">' + o[1] + '</option>').join('');
@@ -96,15 +96,18 @@ function rowsNow() {
   if (R.tab === 'ref') return D.leads.filter(l => inPeriod(l.created_at) && (!camp || l.campaign === camp) && (!st || cashState(l) === st) &&
     hit(q, l.campaign, l.campaign_id, l.mobile, l.upi, l.events.map(e => e.name).join(' ')));
   if (R.tab === 'wd') return D.withdrawals.filter(w => inPeriod(w.created_at) && (!st || w.status === st) && hit(q, w.txn_id, w.admin_note, w.withdrawal_id));
+  if (R.tab === 'arc') return D.archived.filter(a => inPeriod(a.deleted_at) && hit(q, a.campaign_name, a.campaign_id));
   return D.history.filter(h => inPeriod(h.created_at) && (!st || h.entry_type === st) && hit(q, REASON[h.reason] || h.reason, h.campaign_name, h.note));
 }
 
 function renderReports() {
   setStatusOptions();
-  $('t-ref').classList.toggle('on', R.tab === 'ref'); $('t-wd').classList.toggle('on', R.tab === 'wd'); $('t-led').classList.toggle('on', R.tab === 'led');
-  $('f-campw').classList.toggle('hidden', R.tab !== 'ref');
+  if (R.tab === 'arc' && !D.archived.length) R.tab = 'ref';
+  $('t-arc').classList.toggle('hidden', !D.archived.length);
+  $('t-ref').classList.toggle('on', R.tab === 'ref'); $('t-wd').classList.toggle('on', R.tab === 'wd'); $('t-led').classList.toggle('on', R.tab === 'led'); $('t-arc').classList.toggle('on', R.tab === 'arc');
+  $('f-campw').classList.toggle('hidden', R.tab !== 'ref'); $('f-stw').classList.toggle('hidden', R.tab === 'arc');
   $('f-cust').classList.toggle('hidden', $('f-per').value !== 'CUSTOM');
-  $('f-q').placeholder = { ref: 'Search campaign, number, UPI, event...', wd: 'Search transaction ID...', led: 'Search details...' }[R.tab];
+  $('f-q').placeholder = { ref: 'Search campaign, number, UPI, event...', wd: 'Search transaction ID...', led: 'Search details...', arc: 'Search campaign name...' }[R.tab];
   const rows = rowsNow(), part = rows.slice(0, R.shown);
   let tiles = '', head = '', body = '';
 
@@ -136,6 +139,12 @@ function renderReports() {
       '<td data-label="Status">' + (w.status === 'PAID' ? bd('ok', 'Paid') : w.status === 'REJECTED' ? bd('bad', 'Rejected') : bd('wait', 'Pending')) + '</td>' +
       '<td data-label="Transaction ID"><span class="mono">' + esc(w.txn_id || '—') + '</span></td><td data-label="Processed On" style="white-space:nowrap">' + (w.processed_at ? esc(fmtDate(w.processed_at)) : '—') + '</td>' +
       '<td data-label="Remarks">' + esc(w.admin_note || '—') + '</td></tr>').join('');
+  } else if (R.tab === 'arc') {
+    tiles = tile('Deleted Campaigns', rows.length, 'totals only') + tile('Commission Earned', inr(sumOf(rows, a => a.commission)), 'from these campaigns', 'g') +
+      tile('Total Amount Disbursed', inr(sumOf(rows, a => a.disbursed)), 'cashback paid to your users', 'hl') + tile('Clicks / Leads', sumOf(rows, a => a.clicks) + ' / ' + sumOf(rows, a => a.leads), 'across these campaigns');
+    head = '<tr><th>Campaign</th><th class="num">Clicks</th><th class="num">Leads</th><th class="num">Commission Earned</th><th class="num">Cashback Disbursed</th><th>Deleted On</th></tr>';
+    body = part.map(a => '<tr><td data-label="Campaign"><b>' + esc(a.campaign_name || a.campaign_id) + '</b></td><td data-label="Clicks" class="num">' + a.clicks + '</td><td data-label="Leads" class="num">' + a.leads +
+      '</td><td data-label="Commission Earned" class="num"><b>' + inr(a.commission) + '</b></td><td data-label="Cashback Disbursed" class="num"><b>' + inr(a.disbursed) + '</b></td><td data-label="Deleted On" style="white-space:nowrap">' + esc(fmtDate(a.deleted_at)) + '</td></tr>').join('');
   } else {
     const cr = sumOf(rows.filter(h => h.entry_type === 'CREDIT'), h => h.amount), dr = sumOf(rows.filter(h => h.entry_type === 'DEBIT'), h => h.amount);
     tiles = tile('Credits', inr(cr), 'money added', 'g') + tile('Debits', inr(dr), 'money deducted') + tile('Net Change', (cr - dr < 0 ? '−' : '') + inr(Math.abs(cr - dr)), 'in selected period', 'hl');
@@ -147,14 +156,14 @@ function renderReports() {
   $('rb').innerHTML = body || '<tr><td class="empty" colspan="6">No records found for the selected filters.</td></tr>';
   $('more').classList.toggle('hidden', rows.length <= R.shown);
   $('more').textContent = 'Show more (' + (rows.length - R.shown) + ' remaining)';
-  $('rcount').textContent = rows.length ? 'Showing ' + part.length + ' of ' + rows.length + ' record' + (rows.length === 1 ? '' : 's') + '.' : '';
+  $('rcount').textContent = R.tab === 'arc' ? 'Details of deleted campaigns (users, UPIs, individual leads) are removed. Only these totals are kept.' : rows.length ? 'Showing ' + part.length + ' of ' + rows.length + ' record' + (rows.length === 1 ? '' : 's') + '.' : '';
 }
 
 function resetFilters() {
   $('f-per').value = 'ALL'; $('f-from').value = ''; $('f-to').value = ''; $('f-camp').value = ''; $('f-st').value = ''; $('f-q').value = ''; R.shown = PAGE;
 }
 const redraw = () => { R.shown = PAGE; if (D) renderReports(); };
-['t-ref', 't-wd', 't-led'].forEach(id => $(id).addEventListener('click', () => { R.tab = id === 't-ref' ? 'ref' : id === 't-wd' ? 'wd' : 'led'; $('f-st').value = ''; $('f-q').value = ''; redraw(); }));
+['t-ref', 't-wd', 't-led', 't-arc'].forEach(id => $(id).addEventListener('click', () => { R.tab = { 't-ref': 'ref', 't-wd': 'wd', 't-led': 'led', 't-arc': 'arc' }[id]; $('f-st').value = ''; $('f-q').value = ''; redraw(); }));
 ['f-per', 'f-from', 'f-to', 'f-camp', 'f-st'].forEach(id => $(id).addEventListener('change', redraw));
 $('f-q').addEventListener('input', redraw);
 $('f-reset').addEventListener('click', () => { resetFilters(); redraw(); });
@@ -170,6 +179,9 @@ $('f-csv').addEventListener('click', () => {
   } else if (R.tab === 'wd') {
     head = ['Requested On', 'Amount', 'Status', 'Transaction ID', 'Processed On', 'Remarks'];
     data = rows.map(w => [fmtDate(w.created_at), w.amount, w.status, w.txn_id, w.processed_at ? fmtDate(w.processed_at) : '', w.admin_note]);
+  } else if (R.tab === 'arc') {
+    head = ['Campaign', 'Clicks', 'Leads', 'Commission Earned', 'Cashback Disbursed', 'Deleted On'];
+    data = rows.map(a => [a.campaign_name || a.campaign_id, a.clicks, a.leads, a.commission, a.disbursed, fmtDate(a.deleted_at)]);
   } else {
     head = ['Date & Time', 'Details', 'Campaign', 'Type', 'Amount'];
     data = rows.map(h => [fmtDate(h.created_at), REASON[h.reason] || h.reason, h.campaign_name, h.entry_type, h.amount]);
@@ -178,6 +190,6 @@ $('f-csv').addEventListener('click', () => {
   const csv = '\ufeff' + [head, ...data].map(r => r.map(cell).join(',')).join('\r\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-  a.download = { ref: 'Referrals', wd: 'Withdrawals', led: 'Wallet_Statement' }[R.tab] + '_' + istKey(Date.now()) + '.csv';
+  a.download = { ref: 'Referrals', wd: 'Withdrawals', led: 'Wallet_Statement', arc: 'Deleted_Campaigns' }[R.tab] + '_' + istKey(Date.now()) + '.csv';
   document.body.appendChild(a); a.click(); a.remove();
 });

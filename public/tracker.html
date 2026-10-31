@@ -35,6 +35,9 @@
 .pill2{font-size:10px;font-weight:800;letter-spacing:.06em;padding:5px 10px;border-radius:999px;border:1px solid}
 .pill2.successful,.pill2.paid{background:rgba(93,179,43,.15);border-color:var(--green-d);color:var(--green-d)}
 .pill2.pending{background:#FFF4DB;border-color:#E0A21A;color:var(--amber)}.pill2.rejected{background:#FDE7E7;border-color:var(--rose);color:var(--rose)}
+.rbtn{width:auto;margin:0 0 0 auto;padding:6px 12px;min-height:0;font-size:11.5px;font-weight:800;letter-spacing:.02em;border-radius:999px;background:#fff;color:var(--ink);border:1.5px solid var(--ink);box-shadow:none;display:inline-flex;align-items:center;gap:6px}
+.rbtn:before{display:none}.rbtn:disabled{opacity:.7;cursor:default}.rbtn.spinning svg{animation:sp .8s linear infinite}
+.rmsg{margin-top:8px;text-align:right;font-size:10.5px;font-weight:700;color:var(--mute)}.rmsg.bad{color:var(--rose)}
 .nohist{text-align:center;font-size:12.5px;font-weight:600;color:var(--mute);padding:12px}
 #mute{position:fixed;right:max(14px,env(safe-area-inset-right));bottom:max(14px,env(safe-area-inset-bottom));width:42px;height:42px;margin:0;padding:0;border-radius:50%;background:#fff;border:1.5px solid var(--ink);box-shadow:0 6px 16px rgba(10,26,92,.2);z-index:20}
 #mute:before{display:none}#mute.muted{opacity:.7}
@@ -57,13 +60,15 @@
 
  <div id="res" style="display:none">
   <div class="tcard">
-   <h3 class="rt"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Record Found!</h3>
+   <h3 class="rt"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Record Found!<button id="rbtn" type="button" class="rbtn" aria-label="Refresh status"><svg id="rico" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg><span id="rtxt">Refresh</span></button></h3>
    <table>
     <tr><td>Name:</td><td id="vName">-</td></tr>
     <tr><td>Click Time (IST):</td><td id="vClick" class="mono">-</td></tr>
     <tr><td>Last Updated:</td><td id="vUpd" class="mono">-</td></tr>
     <tr><td>Campaign:</td><td id="vCamp">-</td></tr>
+    <tr><td>Payout:</td><td id="vPay">-</td></tr>
    </table>
+   <div id="rmsg" class="rmsg">Last checked: <span id="vChk">-</span></div>
   </div>
   <div class="tcard"><div class="ptitle">Campaign Progress</div><div id="goals" class="prow"></div></div>
  </div>
@@ -71,7 +76,7 @@
  <div id="hchip" class="chip"><span id="hlabel">🕑 View Previous Entries</span></div>
  <div id="hld" class="ld">Loading your previous entries...</div>
  <div id="hlist" style="display:none"><div class="ahead"><h4>🕑 Previous Entries</h4><small id="hcount"></small></div><div id="hrows"></div></div>
- <div class="trust">Only your own progress is shown. No payout amounts.</div>
+ <div class="trust">Only your own progress and payout are shown.</div>
 </div>
 
 <div class="marquee"><div class="mt">

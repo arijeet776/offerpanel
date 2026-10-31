@@ -40,7 +40,7 @@ button span{position:relative}
 .notes{margin-top:14px;padding:12px 14px;background:var(--card2);border:1.5px solid rgba(93,179,43,.55);border-radius:18px;text-align:left}
 .notes b{display:block;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--green-d);margin-bottom:7px}
 .notes ul{list-style:none}.notes li{display:flex;gap:8px;font-size:11.5px;font-weight:600;line-height:1.45;margin-bottom:5px}
-.notes li:before{content:"✓";flex:none;width:16px;height:16px;border-radius:50%;background:var(--green);color:#0B2204;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:1px}
+.notes li:before{content:"";flex:none;width:7px;height:7px;border-radius:50%;background:var(--green);margin:6px 3px 0 4px}
 .msg{margin-top:8px;font-size:13px;font-weight:700;display:none}.msg.err{color:#D14343}.msg.ok{color:var(--green-d)}
 .trust{margin-top:12px;font-size:11.5px;color:var(--mute);font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px}
 .trust svg{stroke:var(--mute)}
@@ -56,3 +56,10 @@ button span{position:relative}
 .hidden{display:none!important}
 .err{padding:30px 10px;text-align:center;font-weight:700}
 .ring .in{overflow:hidden}.ring .in img{width:100%;height:100%;object-fit:cover}
+/* paused / ended offer: no form, just a clear message */
+.paused{text-align:center;padding:22px 10px 8px}
+.paused .pi{width:58px;height:58px;margin:0 auto 10px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;background:rgba(239,68,68,.1);border:2px solid #ef4444}
+.paused h2{font-size:20px;font-weight:800;color:#C23030;margin-bottom:6px}
+.paused p{font-size:13px;color:var(--mute);line-height:1.55;font-weight:500}
+#captchaBox{display:flex;justify-content:center;min-height:78px;overflow:hidden}
+

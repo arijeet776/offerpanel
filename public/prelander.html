@@ -15,12 +15,14 @@
 <a id="track" class="track hidden" target="_top" rel="noopener"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>Track your leads</a>
 <div class="ring" id="ring"><div class="in" id="ringin"></div><div class="tag" id="tag">LIVE</div></div>
 <div class="badge"><i id="cdot"></i><span id="cname"></span><div class="price" id="price"></div></div>
-<p class="sub">Enter your details once to unlock the task.<br><b>Your payout will be sent to the UPI ID below.</b></p>
+<div id="paused" class="paused hidden"><div class="pi" id="pi">⏸</div><h2 id="pt">Offer Paused</h2><p id="pp">This offer is paused right now. Please check back later.</p></div>
+<p class="sub" id="sub">Enter your details once to unlock the task.<br><b>Your payout will be sent to the UPI ID below.</b></p>
 <form id="f" novalidate>
 <div class="fg hidden" id="w-name"><label for="name">Full name</label><div class="iw"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M20 21a8 8 0 1 0-16 0"/><circle cx="12" cy="7" r="4"/></svg><input id="name" type="text" placeholder="e.g. Rahul Sharma" autocomplete="off" autocapitalize="off"></div></div>
 <div class="fg" id="w-upi"><label for="upi">UPI ID (for payout)</label><div class="iw"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg><input id="upi" type="text" placeholder="e.g. rahul@okaxis" autocomplete="off" autocapitalize="off"></div></div>
 <div class="fg hidden" id="w-mobile"><label for="mobile">Mobile number</label><div class="iw"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/></svg><input id="mobile" type="tel" placeholder="e.g. 9876543210" autocomplete="off" autocapitalize="off"></div></div>
 <div class="fg hidden" id="w-gmail"><label for="gmail">Gmail ID</label><div class="iw"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 6l-10 7L2 6"/></svg><input id="gmail" type="email" placeholder="e.g. rahul@gmail.com" autocomplete="off" autocapitalize="off"></div></div>
+<div class="fg hidden" id="w-captcha"><div id="captchaBox"><div id="captcha"></div></div></div>
 <button type="submit" id="btn"><span id="bt">Continue to task →</span></button>
 </form>
 <div class="notes hidden" id="notes"><b>How to complete task</b><ul id="nl"></ul></div>

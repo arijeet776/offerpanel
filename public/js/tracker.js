@@ -1,6 +1,6 @@
 // Offer status tracker. Campaign id comes from the URL: /tracker/<campaign id>
 const CID = (location.pathname.split('/').filter(Boolean)[1] || '').trim().toUpperCase();
-let lastUpi = '', cached = null, histOpen = false;
+let lastUpi = '', cached = null, histOpen = false, cur = { mode: 'status', key: '' };
 const show = (id, on, disp) => { $(id).style.display = on ? (disp || 'block') : 'none'; };
 const IST = d => {
   if (!d) return 'N/A';
@@ -35,18 +35,26 @@ $('mute').addEventListener('click', () => { muted = !muted; try { localStorage.s
 renderMute();
 
 // ---------- rendering ----------
-function renderRecord(r) {
+const payPill = st => { const s = String(st || 'PENDING').toUpperCase(), cls = s === 'SUCCESSFUL' ? 'successful' : s === 'REJECTED' ? 'rejected' : 'pending'; return '<span class="pill2 ' + cls + '">' + s + '</span>'; };
+function payoutHtml(p) {
+  if (!p) return '-';
+  const part = p.status === 'PENDING' && p.paid > 0 ? '<div style="font-size:11px;color:var(--mute);font-weight:700;margin-top:3px">' + inr(p.paid) + ' of ' + inr(p.amount) + ' paid so far</div>' : '';
+  return '<b>' + (p.amount > 0 ? inr(p.amount) : '—') + '</b> ' + payPill(p.status) + part;
+}
+function renderRecord(r, silent) {
   $('vName').textContent = r.name || 'User';
   $('vClick').textContent = IST(r.clickAt);
   $('vUpd').textContent = r.updatedAt ? IST(r.updatedAt) : 'Task in progress';
   $('vCamp').textContent = r.campaign || 'N/A';
+  $('vPay').innerHTML = payoutHtml(r.payout);
+  $('vChk').textContent = IST(Date.now()); $('rmsg').className = 'rmsg';
   $('goals').innerHTML = (r.goalsList || []).map((g, i) => {
     const s = String(g.status || 'PENDING').toUpperCase();
     const cls = s === 'SUCCESSFUL' ? 'successful' : s === 'REJECTED' ? 'rejected' : 'pending';
     return '<div class="citem" style="animation-delay:' + (i * 80) + 'ms"><div class="cbadge ' + cls + '">' + (cls === 'successful' ? '✓' : cls === 'rejected' ? '✕' : '⏳') + '</div><div class="gt">' + esc(g.goalName) + '</div><div class="st ' + cls + '">' + (cls === 'successful' ? 'SUCCESSFUL' : cls === 'rejected' ? 'REJECTED' : 'PENDING') + '</div></div>';
   }).join('');
   show('res', true);
-  if ((r.goalsList || []).length && r.goalsList.every(g => String(g.status).toUpperCase() === 'SUCCESSFUL')) setTimeout(sWin, 500);
+  if (!silent && (r.goalsList || []).length && r.goalsList.every(g => String(g.status).toUpperCase() === 'SUCCESSFUL')) setTimeout(sWin, 500);
 }
 
 async function search() {
@@ -54,7 +62,7 @@ async function search() {
   if (!upi) return alert('Please enter a valid UPI ID.');
   ctx(); sHello();
   show('ld', true); show('err', false); show('res', false); show('back', false); show('hlist', false); show('hchip', false);
-  lastUpi = upi; cached = null; histOpen = false; $('hlabel').textContent = '🕑 View Previous Entries';
+  lastUpi = upi; cached = null; histOpen = false; cur = { mode: 'status', key: '' }; $('hlabel').textContent = '🕑 View Previous Entries';
   try {
     const r = await api('/api/tracker/status', { method: 'POST', body: { upi, cid: CID } });
     show('ld', false);
@@ -69,7 +77,7 @@ function listHtml(a) {
   $('hcount').textContent = a.length + (a.length === 1 ? ' entry' : ' entries');
   $('hrows').innerHTML = a.map((x, i) => {
     const st = String(x.overallStatus || 'PENDING').toUpperCase();
-    return '<div class="arow" style="animation-delay:' + (i * 60) + 'ms" data-i="' + i + '"><div class="l"><div class="c">' + esc(x.campaign || 'N/A') + '</div><div class="d">' + esc(IST(x.clickAt)) + '</div></div><div class="pill2 ' + st.toLowerCase() + '">' + esc(st) + '</div></div>';
+    return '<div class="arow" style="animation-delay:' + (i * 60) + 'ms" data-i="' + i + '"><div class="l"><div class="c">' + esc(x.campaign || 'N/A') + '</div><div class="d">' + esc(IST(x.clickAt)) + (x.payout && x.payout.amount > 0 ? ' • ' + esc(inr(x.payout.amount)) : '') + '</div></div><div class="pill2 ' + st.toLowerCase() + '">' + esc(st) + '</div></div>';
   }).join('');
 }
 async function toggleHistory() {
@@ -85,10 +93,32 @@ async function toggleHistory() {
 }
 $('hrows').addEventListener('click', e => {
   const row = e.target.closest('.arow'); if (!row || !cached) return;
-  renderRecord(cached[Number(row.dataset.i)]); show('hlist', false); histOpen = false; $('hlabel').textContent = '🕑 View Previous Entries'; show('back', true);
+  const picked = cached[Number(row.dataset.i)]; cur = { mode: 'hist', key: picked.clickAt + '|' + picked.campaignId };
+  renderRecord(picked); show('hlist', false); histOpen = false; $('hlabel').textContent = '🕑 View Previous Entries'; show('back', true);
   $('res').scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 $('backGo').addEventListener('click', () => { show('back', false); if (cached) { listHtml(cached); show('hlist', true); histOpen = true; $('hlabel').textContent = '▲ Hide Previous Entries'; } });
 $('hchip').addEventListener('click', toggleHistory);
+
+// Refresh the record that is on screen without reloading the page
+async function refreshNow() {
+  if (!lastUpi || $('rbtn').disabled) return;
+  $('rbtn').disabled = true; $('rbtn').classList.add('spinning'); $('rtxt').textContent = 'Updating...';
+  try {
+    if (cur.mode === 'hist') {
+      const r = await api('/api/tracker/history', { method: 'POST', body: { upi: lastUpi } });
+      cached = r.attempts || [];
+      const again = cached.find(a => a.clickAt + '|' + a.campaignId === cur.key);
+      if (again) renderRecord(again, true);
+    } else {
+      const r = await api('/api/tracker/status', { method: 'POST', body: { upi: lastUpi, cid: CID } });
+      cached = null; if (histOpen) { show('hlist', false); histOpen = false; $('hlabel').textContent = '🕑 View Previous Entries'; }
+      if (r.found) renderRecord(r, true);
+    }
+    tone(1180, 0, .06, 'sine', .028);
+  } catch (e) { $('rmsg').className = 'rmsg bad'; $('rmsg').textContent = e.status === 429 ? 'Too many refreshes. Please wait a few minutes.' : (e.message || 'Could not refresh. Try again.'); }
+  $('rbtn').disabled = false; $('rbtn').classList.remove('spinning'); $('rtxt').textContent = 'Refresh';
+}
+$('rbtn').addEventListener('click', refreshNow);
 $('go').addEventListener('click', search);
 $('upi').addEventListener('keydown', e => { if (e.key === 'Enter') search(); });

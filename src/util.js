@@ -5,6 +5,8 @@ const rid = n => Math.floor(Math.random() * 10 ** n).toString().padStart(n, '0')
 // Random, non-sequential, never re-used after a campaign is deleted. 8 chars, no look-alike letters.
 const ID_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const genCampaignId = () => Array.from({ length: 8 }, () => ID_CHARS[crypto.randomInt(ID_CHARS.length)]).join('');
+// Partner (referral) ID: "DS" + 6 random characters from the same look-alike-free alphabet, e.g. DS7KM2QX.
+const genRefId = () => 'DS' + Array.from({ length: 6 }, () => ID_CHARS[crypto.randomInt(ID_CHARS.length)]).join('');
 const genId = prefix => prefix + Date.now() + rid(3);
 const isValidUpi = s => /^[a-zA-Z0-9._-]{2,}@[a-zA-Z0-9]{2,}$/.test(s);
 const isEmail = s => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
@@ -14,6 +16,15 @@ const normName = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
 const normMobile = v => { let d = String(v == null ? '' : v).replace(/\D/g, ''); if (d.length === 12 && d.startsWith('91')) d = d.slice(2); else if (d.length === 11 && d.startsWith('0')) d = d.slice(1); return /^[6-9]\d{9}$/.test(d) ? d : ''; };
 // 9876543210 -> 98******10 (first 2 and last 2 digits stay, the middle is hidden). Use this anywhere a number is shown.
 const maskMobile = v => { const d = normMobile(v) || String(v == null ? '' : v).replace(/\D/g, ''); if (!d) return ''; return d.length <= 4 ? '*'.repeat(d.length) : d.slice(0, 2) + '*'.repeat(d.length - 4) + d.slice(-2); };
+// The visitor's IP. Behind Render / Cloudflare the socket address is the proxy's, so read the header the edge sets.
+// CLIENT_IP_HEADER (optional env) forces one header name. loose=true also trusts the left-most X-Forwarded-For
+// entry: fine for just recording a click, never used for rate limiting because a client can fake it.
+const clientIp = (req, loose) => {
+  const one = h => { const v = req.headers[h]; return v ? String(Array.isArray(v) ? v[0] : v).split(',')[0].trim() : ''; };
+  const custom = String(process.env.CLIENT_IP_HEADER || '').toLowerCase().trim();
+  const ip = (custom && one(custom)) || one('cf-connecting-ip') || one('true-client-ip') || (loose && one('x-forwarded-for')) || req.ip || '';
+  return String(ip).replace(/^::ffff:/, '').slice(0, 64);
+};
 const ah = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 class HttpError extends Error {
@@ -90,4 +101,4 @@ function convEvents(r) {
     .filter(e => e[1]).map(e => ({ no: e[0], name: e[1], at: e[2] }));
 }
 
-module.exports = { MAX_EVENTS, campEvents, convEvents, genCampaignId, parseMacros, macroList, clean, num, genId, isValidUpi, isEmail, normMobile, maskMobile, likeEscape, normName, ah, HttpError, buildRedirect, userPayoutFor, CLICK_ID_MACRO_MAP };
+module.exports = { MAX_EVENTS, campEvents, convEvents, genCampaignId, genRefId, parseMacros, macroList, clean, num, genId, isValidUpi, isEmail, normMobile, maskMobile, clientIp, likeEscape, normName, ah, HttpError, buildRedirect, userPayoutFor, CLICK_ID_MACRO_MAP };

@@ -31,3 +31,12 @@ services:
         sync: false
       - key: SHEETS_SECRET
         sync: false
+      - key: CLIENT_IP_HEADER        # optional: header that carries the visitor's real IP (default: automatic)
+        sync: false
+      - key: TRUST_PROXY             # optional: number of proxies in front of this app (default 1)
+        sync: false
+      - key: RECAPTCHA_SITE_KEY      # reCAPTCHA v2 checkbox: site key (public)
+        sync: false
+      - key: RECAPTCHA_SECRET        # reCAPTCHA v2 checkbox: secret key (private)
+        sync: false
+

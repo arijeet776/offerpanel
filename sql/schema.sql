@@ -239,11 +239,41 @@ begin
 end $$;
 
 -- Deletes one campaign and everything attached to it, in one transaction. Wallet ledger + withdrawals are NOT touched.
+-- When a campaign is deleted everything about it is erased, except a small per-partner summary
+-- (clicks, leads, commission earned, cashback paid to the partner's users). It holds no user details.
+create table if not exists campaign_archive (
+  id bigint generated always as identity primary key,
+  campaign_id text,
+  campaign_name text,
+  ref_id text,
+  clicks integer default 0,
+  leads integer default 0,
+  commission numeric default 0,
+  disbursed numeric default 0,
+  deleted_at timestamptz default now()
+);
+create index if not exists campaign_archive_ref_idx on campaign_archive (ref_id);
+alter table campaign_archive enable row level security;
+
 create or replace function purge_campaign(p_id text) returns jsonb language plpgsql as $$
-declare n_pay int; n_conv int; n_clk int; n_lnk int;
+declare n_pay int; n_conv int; n_clk int; n_lnk int; cname text;
 begin
-  perform 1 from campaigns where campaign_id = p_id;
+  select campaign_name into cname from campaigns where campaign_id = p_id;
   if not found then raise exception 'not_found'; end if;
+
+  insert into campaign_archive (campaign_id, campaign_name, ref_id, clicks, leads, commission, disbursed)
+  select p_id, cname, r.ref_id,
+    (select count(*) from clicks k where k.campaign_id = p_id and k.ref_id = r.ref_id),
+    (select count(*) from conversions v where v.campaign_id = p_id and v.ref_id = r.ref_id),
+    coalesce((select sum(case when l.reason = 'REVERSAL' then -l.amount else l.amount end) from wallet_ledger l
+              where l.reason in ('CONVERSION', 'REVERSAL')
+                and l.conversion_id in (select id from conversions where campaign_id = p_id and ref_id = r.ref_id)), 0),
+    coalesce((select sum(p.amount) from payments p
+              where p.pay_type = 'USER'
+                and p.conversion_id in (select id from conversions where campaign_id = p_id and ref_id = r.ref_id)), 0)
+  from (select ref_id from clicks where campaign_id = p_id union select ref_id from conversions where campaign_id = p_id) r
+  where r.ref_id is not null and r.ref_id <> 'DIRECT';
+
   delete from payments where conversion_id in (select id from conversions where campaign_id = p_id);
   get diagnostics n_pay = row_count;
   delete from conversions where campaign_id = p_id;      get diagnostics n_conv = row_count;
@@ -411,6 +441,7 @@ begin
     goal2 = case when p_idx = 2 then p_goal else goal2 end,  goal2_at = case when p_idx = 2 then now() else goal2_at end,
     goal3 = case when p_idx = 3 then p_goal else goal3 end,  goal3_at = case when p_idx = 3 then now() else goal3_at end,
     user_payout = coalesce(user_payout, 0) + coalesce(p_user, 0),
+    user_status = case when upper(coalesce(user_status, '')) = 'PAID' and coalesce(p_user, 0) > 0 then 'PENDING' else user_status end,
     ref_payout  = coalesce(ref_payout, 0) + coalesce(p_refamt, 0),
     network_click_id = coalesce(network_click_id, p_net)
   where id = c.id returning * into c;
@@ -477,3 +508,17 @@ begin
 end $$;
 revoke all on function pay_conversion(bigint, numeric, text, text) from public, anon, authenticated;
 grant execute on function pay_conversion(bigint, numeric, text, text) to service_role;
+
+-- ===== Speed =====
+-- Click counts per campaign for one partner, counted inside the database (the dashboard no longer downloads every click).
+create or replace function partner_clicks(p_ref text) returns table (campaign_id text, click_count bigint) language sql stable as $$
+  select k.campaign_id, count(*) from clicks k where k.ref_id = p_ref group by k.campaign_id
+$$;
+revoke all on function partner_clicks(text) from public, anon, authenticated;
+grant execute on function partner_clicks(text) to service_role;
+
+create index if not exists payments_conv_idx on payments (conversion_id);
+create index if not exists clicks_upi_idx on clicks (upi);
+create index if not exists clicks_created_idx on clicks (created_at desc);
+create index if not exists conversions_created_idx on conversions (created_at desc);
+create index if not exists wallet_conv_idx on wallet_ledger (conversion_id);

@@ -2,7 +2,7 @@ try { require('dotenv').config(); } catch (e) { /* dotenv optional on Render */ 
 const express = require('express');
 
 const app = express();
-app.set('trust proxy', 1);
+app.set('trust proxy', Number(process.env.TRUST_PROXY) || 1); // number of proxies in front of this app (optional env TRUST_PROXY)
 app.disable('x-powered-by');
 
 // Frontend (Netlify) origins allowed to call this API. Comma separated, no trailing slash.
@@ -22,6 +22,7 @@ app.use((req, res, next) => {
   next();
 });
 
+try { app.use(require('compression')()); } catch (e) { console.warn('[config] compression is not installed: responses are sent uncompressed'); }
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false, limit: '1mb' }));
 app.use((req, res, next) => {

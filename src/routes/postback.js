@@ -26,7 +26,8 @@ module.exports = U.ah(async (req, res) => {
   for (const [k, v] of Object.entries(raw)) { lp[k.toLowerCase()] = v; if (k.toLowerCase() !== 'key') safe[k] = v; }
 
   const secret = process.env.POSTBACK_SECRET;
-  if (secret && !safeEq(str(lp.key), secret)) return res.status(403).send('forbidden');
+  if (!secret) { console.error('[postback] POSTBACK_SECRET is not set: refusing postbacks until it is'); return res.status(503).send('postback secret not configured'); }
+  if (!safeEq(str(lp.key), secret)) return res.status(403).send('forbidden');
 
   const cidIn = str(lp.cid).toUpperCase();
   const seen = { click: null, campaign: cidIn || null, net: null, event: null };

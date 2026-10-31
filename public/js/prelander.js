@@ -4,7 +4,7 @@ const parts = location.pathname.split('/').filter(Boolean).map(decodeURIComponen
 const fromPath = parts.length && !/\.html$/i.test(parts[0]) ? parts : [];
 const cid = (fromPath[0] || qs.get('cid') || qs.get('CID') || '').trim().toUpperCase();
 const ref = (fromPath[1] || qs.get('ref') || qs.get('p3') || 'DIRECT').trim().toUpperCase();
-let fields = ['MOBILE']; // details this campaign collects (UPI ID is always asked); the admin sets them per campaign
+let fields = ['MOBILE'], captchaId = null, captchaToken = '', captchaOn = false; // details this campaign collects (UPI ID is always asked); the admin sets them per campaign
 
 function fail(m) { $('err').textContent = m; $('err').classList.remove('hidden'); }
 function show(t, type) { $('msg').textContent = t; $('msg').className = 'msg ' + (type || ''); $('msg').style.display = t ? 'block' : 'none'; }
@@ -19,19 +19,40 @@ function show(t, type) { $('msg').textContent = t; $('msg').className = 'msg ' +
     $('tag').textContent = live ? 'LIVE' : 'INACTIVE';
     $('tag').classList.toggle('off', !live);
     $('ring').style.setProperty('--ring', live ? '#5DB32B' : '#ef4444');
-    if (!live) { $('cdot').style.background = '#ef4444'; $('btn').disabled = true; $('bt').textContent = 'Offer is not active'; }
+    if (!live) { // paused or ended: no form at all, only a clear message
+      const ended = c.status === 'ENDED';
+      $('cdot').style.background = '#ef4444'; $('tag').textContent = ended ? 'ENDED' : 'PAUSED';
+      $('pi').textContent = ended ? '🏁' : '⏸'; $('pt').textContent = ended ? 'Offer Ended' : 'Offer Paused';
+      $('pp').textContent = ended ? 'This offer has ended and is no longer taking new entries.' : 'This offer is paused right now. No need to fill any details. Please check back later.';
+      ['price', 'sub', 'f'].forEach(id => $(id).classList.add('hidden')); $('paused').classList.remove('hidden');
+    }
     const fb = () => { $('ringin').textContent = c.name.slice(0, 3).toUpperCase(); };
     if (c.logo) { const i = new Image(); i.alt = c.name; i.onerror = fb; i.src = c.logo; $('ringin').appendChild(i); } else fb();
     $('track').href = '/tracker/' + encodeURIComponent(cid); $('track').classList.remove('hidden');
     fields = Array.isArray(c.fields) ? c.fields : ['MOBILE'];
+    if (live && c.captchaSiteKey) loadCaptcha(c.captchaSiteKey);
     [['NAME', 'w-name'], ['MOBILE', 'w-mobile'], ['GMAIL', 'w-gmail']].forEach(([k, id]) => $(id).classList.toggle('hidden', !fields.includes(k)));
     // How-to steps: one step per line (a single paragraph is split at full stops, as before)
     const raw = String(c.notes || '').trim();
     let pts = raw.split(/\r?\n/).map(s => s.trim()).filter(Boolean), dot = false;
     if (pts.length === 1) { pts = raw.split('.').map(s => s.trim()).filter(Boolean); dot = true; }
-    if (pts.length) { pts.forEach(p => { const li = document.createElement('li'); li.textContent = dot ? p + '.' : p; $('nl').appendChild(li); }); $('notes').classList.remove('hidden'); }
+    if (live && pts.length) { pts.forEach(p => { const li = document.createElement('li'); li.textContent = dot ? p + '.' : p; $('nl').appendChild(li); }); $('notes').classList.remove('hidden'); }
   } catch (e) { fail(e.message || 'Offer not found.'); }
 })();
+
+// ---- reCAPTCHA (shown only when the server has a site key) ----
+function loadCaptcha(siteKey) {
+  captchaOn = true; $('w-captcha').classList.remove('hidden');
+  window.qxCaptchaReady = () => {
+    const narrow = ($('w-captcha').clientWidth || 320) < 310;
+    captchaId = grecaptcha.render('captcha', { sitekey: siteKey, size: narrow ? 'compact' : 'normal', callback: t => { captchaToken = t; show(''); }, 'expired-callback': () => { captchaToken = ''; }, 'error-callback': () => { captchaToken = ''; } });
+  };
+  const sc = document.createElement('script');
+  sc.src = 'https://www.google.com/recaptcha/api.js?onload=qxCaptchaReady&render=explicit'; sc.async = true; sc.defer = true;
+  sc.onerror = () => show('Could not load the verification check. Please check your internet connection or disable ad blockers, then reload.', 'err');
+  document.head.appendChild(sc);
+}
+const resetCaptcha = () => { captchaToken = ''; try { if (captchaOn && captchaId !== null) grecaptcha.reset(captchaId); } catch (e) { /* widget not ready */ } };
 
 $('f').addEventListener('submit', async ev => {
   ev.preventDefault();
@@ -42,13 +63,14 @@ $('f').addEventListener('submit', async ev => {
   if (fields.includes('NAME') && !name) return show('Please enter your Name.', 'err');
   if (fields.includes('MOBILE') && !/^\+?\d{10,14}$/.test(mobile.replace(/\s+/g, ''))) return show('Please enter a valid Mobile Number.', 'err');
   if (fields.includes('GMAIL') && !gmail.includes('@')) return show('Please enter a valid Gmail ID.', 'err');
+  if (captchaOn && !captchaToken) return show('Please tick "I\'m not a robot" to continue.', 'err');
   $('btn').disabled = true; $('bt').textContent = 'Redirecting...'; show('');
   try {
-    const r = await api('/api/prelander', { method: 'POST', body: { name, upi, cid, ref, mobile, gmail } });
+    const r = await api('/api/prelander', { method: 'POST', body: { name, upi, cid, ref, mobile, gmail, captcha: captchaToken } });
     $('s2').className = 'step done'; confetti();
     setTimeout(() => { try { window.top.location.href = r.redirectUrl; } catch (e) { location.href = r.redirectUrl; } }, 650);
   } catch (e) {
-    $('btn').disabled = false; $('bt').textContent = 'Continue to task →'; show(e.message, 'err');
+    $('btn').disabled = false; $('bt').textContent = 'Continue to task →'; show(e.message, 'err'); resetCaptcha();
   }
 });
 

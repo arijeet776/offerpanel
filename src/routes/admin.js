@@ -44,7 +44,7 @@ router.get('/data', ah(async (req, res) => {
     fetchAll('campaigns', '*', q => q.neq('status', 'DELETED').order('created_at').order('campaign_id')),
     fetchAll('referrers', 'ref_id,name,upi,mobile', q => q.order('ref_id')),
     fetchAll('generated_links', '*', q => q.order('created_at', { ascending: false }).order('link_id')),
-    fetchAll('conversions', '*', q => q.order('created_at', { ascending: false }).order('id')),
+    fetchAll('conversions', 'id,click_id,upi,name,status,campaign,goal,ref_id,user_status,ref_status,final_status,created_at,network_click_id,campaign_id,goal2,goal3,user_payout,ref_payout,user_note,ref_note,goal_at,goal2_at,goal3_at,events', q => q.order('created_at', { ascending: false }).order('id')),
     fetchAll('payments', '*', q => q.order('created_at', { ascending: false }).order('payment_id')),
     fetchAll('withdrawals', '*', q => q.order('created_at', { ascending: false }).order('withdrawal_id'))
   ]);
@@ -91,6 +91,16 @@ router.get('/reports/clicks', ah(async (req, res) => {
   });
 }));
 
+// ---------- Which IP does the server see for a visitor? (admin check) ----------
+router.get('/debug/ip', (req, res) => {
+  const h = n => req.headers[n] || null;
+  res.json({
+    success: true, detected: U.clientIp(req, true), usedForRateLimit: U.clientIp(req),
+    seen: { 'cf-connecting-ip': h('cf-connecting-ip'), 'true-client-ip': h('true-client-ip'), 'x-forwarded-for': h('x-forwarded-for'), 'req.ip': req.ip },
+    clientIpHeaderEnv: process.env.CLIENT_IP_HEADER || null, trustProxyEnv: process.env.TRUST_PROXY || null
+  });
+});
+
 // ---------- Database viewer (read-only) ----------
 const DB_TABLES = {
   campaigns:       { label: 'Campaigns',      order: 'created_at', search: ['campaign_id', 'campaign_name', 'platform', 'status'] },
@@ -102,6 +112,7 @@ const DB_TABLES = {
   wallet_ledger:   { label: 'Wallet Ledger',  order: 'id',         search: ['ref_id', 'reason', 'campaign_name', 'withdrawal_id', 'note'] },
   withdrawals:     { label: 'Withdrawals',    order: 'created_at', search: ['withdrawal_id', 'ref_id', 'upi', 'name', 'status', 'txn_id'] },
   postback_log:    { label: 'Postback Log',   order: 'id',         search: ['result', 'campaign_id', 'click_id', 'network_click_id', 'event_name'] },
+  campaign_archive: { label: 'Deleted Campaign Summary', order: 'id', search: ['campaign_id', 'campaign_name', 'ref_id'] },
   sync_log:        { label: 'Sheets Sync Log', order: 'id',        search: ['table_name', 'status', 'message'] }
 };
 const SECRET_KEY = /key|secret|token|pass|auth/i;
@@ -186,11 +197,14 @@ function buildCampaign(b) {
     if (!Number.isFinite(p) || p < 0) throw new HttpError(400, 'Payout for Event ' + (i + 1) + ' must be 0 or more.');
     return { name: g, payout: Math.round(p * 100) / 100 };
   });
+  // The admin picks the ONE event that pays (payout_event, 1-based). Every other event is Rs0: its postback only shows as successful.
+  const pe = parseInt(b.payout_event, 10);
+  if (Number.isInteger(pe) && pe >= 1 && pe <= events.length) events.forEach((e, i) => { if (i !== pe - 1) e.payout = 0; });
   const n = events.length;
   const used = events.map(e => e.name.toLowerCase());
   if (new Set(used).size !== used.length) throw new HttpError(400, 'Event names must be different from each other.');
   const total = Math.round(events.reduce((s, e) => s + e.payout, 0) * 100) / 100;
-  if (total <= 0) throw new HttpError(400, 'At least one event must have a payout (total payout must be above 0).');
+  if (total <= 0) throw new HttpError(400, 'Set a payout above 0 on the event that should pay.');
   const at = i => events[i] || { name: '', payout: 0 }; // old columns still hold the first 3 events
 
   let user = U.num(b.user_default_payout, 0);
@@ -301,7 +315,7 @@ router.delete('/campaigns/:id', ah(async (req, res) => {
   }
   const { data, error } = await sb.rpc('purge_campaign', { p_id: id });
   if (error) { if (String(error.message).includes('not_found')) throw new HttpError(404, 'Campaign not found.'); throw error; }
-  res.json({ success: true, message: 'Campaign and all its data deleted.', removed: data });
+  res.json({ success: true, message: 'Campaign deleted. Partners keep only a totals summary for it.', removed: data });
 }));
 
 // ---------- Payments ----------

@@ -88,12 +88,12 @@ table.rt td.num,table.rt th.num{text-align:right}
    <div class="hintw" id="whint"></div><button id="wgo" style="margin-top:10px">Send Withdrawal Request</button><p class="wmsg" id="wmsg"></p></div>
  </div>
  <div class="sect"><div><h3>Reports</h3><p>Your referrals, withdrawals and wallet activity. Use the filters to pick any period.</p></div></div>
- <div class="rtabs2"><button id="t-ref" class="on">Referrals</button><button id="t-wd">Withdrawals</button><button id="t-led">Wallet Statement</button></div>
+ <div class="rtabs2"><button id="t-ref" class="on">Referrals</button><button id="t-wd">Withdrawals</button><button id="t-led">Wallet Statement</button><button id="t-arc" class="hidden">Deleted Campaigns</button></div>
  <div class="filters">
   <div><label for="f-per">Period</label><select id="f-per"><option value="ALL">All Time</option><option value="TODAY">Today</option><option value="YESTERDAY">Yesterday</option><option value="7D">Last 7 Days</option><option value="30D">Last 30 Days</option><option value="MONTH">This Month</option><option value="LASTMONTH">Last Month</option><option value="CUSTOM">Custom Range</option></select></div>
   <div class="cust hidden" id="f-cust"><div><label for="f-from">From</label><input type="date" id="f-from"></div><div><label for="f-to">To</label><input type="date" id="f-to"></div></div>
   <div id="f-campw"><label for="f-camp">Campaign</label><select id="f-camp"></select></div>
-  <div><label for="f-st" id="f-stl">Status</label><select id="f-st"></select></div>
+  <div id="f-stw"><label for="f-st" id="f-stl">Status</label><select id="f-st"></select></div>
   <div><label for="f-q">Search</label><input id="f-q" placeholder="Search..." autocomplete="off"></div>
   <div class="fbtns"><button class="sec" id="f-reset">Reset</button><button class="sec" id="f-csv">⬇ CSV</button></div>
  </div>

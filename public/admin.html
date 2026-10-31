@@ -65,7 +65,7 @@
   <h3 style="margin:22px 0 0">3. Events &amp; payouts</h3>
   <label>Number of events</label><select id="f-events"></select>
   <div id="f-evs"></div>
-  <div class="hint">Add as many events as the campaign needs (up to 20). Payout can be 0 for an event that pays nothing. Total payout (all events): <b id="f-total">₹0</b></div>
+  <div class="hint">Add as many events as the campaign needs. <b>Tick "pays" on the one event that carries the payout</b>; every other event is ₹0 (its postback just shows as successful for the user). Payout: <b id="f-total">₹0</b></div>
   <label>Default User Payout (₹ out of the total, optional)</label><input id="f-user" type="number" min="0" step="any" placeholder="Blank = user gets everything unless the partner splits it">
 
   <h3 style="margin:22px 0 0">4. Instructions</h3>
@@ -107,7 +107,7 @@
   <p class="note" id="db-sum" style="margin:0 0 10px"></p>
   <div class="tw"><table><thead id="db-head"></thead><tbody id="db-body"></tbody></table></div>
   <div class="flex2" style="margin-top:14px;align-items:center;justify-content:space-between"><div style="flex:0 0 auto;min-width:0"><button class="sec" id="db-prev" style="margin:0">← Prev</button></div><span class="small" id="db-pg"></span><div style="flex:0 0 auto;min-width:0"><button class="sec" id="db-next" style="margin:0">Next →</button></div></div>
-  <p class="note" style="margin-top:12px">Read-only view of the database.</p>
+  <p class="note" style="margin-top:12px">Read-only view of the database. <a href="#" id="ipcheck" style="color:var(--ink);font-weight:700">Check visitor IP detection</a></p>
  </div>
 </div></div>
 

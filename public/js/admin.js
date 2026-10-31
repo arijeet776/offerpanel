@@ -96,7 +96,7 @@ async function setStatus(id, status) { try { await call('/campaigns/' + encodeUR
 async function delCampaign(id) {
   try {
     const p = await call('/campaigns/' + encodeURIComponent(id) + '/delete-preview');
-    let m = 'PERMANENTLY delete "' + p.name + '" (' + id + ')?\n\nThis erases from the database:\n• ' + p.clicks + ' clicks\n• ' + p.conversions + ' conversions (and their user payment records)\n• ' + p.links + ' referral links\n\nPartner wallets and withdrawals are NOT touched. This cannot be undone.';
+    let m = 'PERMANENTLY delete "' + p.name + '" (' + id + ')?\n\nThis erases from the database:\n• ' + p.clicks + ' clicks\n• ' + p.conversions + ' conversions (and their user payment records)\n• ' + p.links + ' referral links\n\nEach partner keeps only a totals summary for it (clicks, leads, commission earned, cashback paid) - no user details. Partner wallets and withdrawals are NOT touched. This cannot be undone.';
     if (!confirm(m)) return;
     let force = false;
     if (p.unpaid > 0) {
@@ -113,18 +113,28 @@ async function delCampaign(id) {
 const LEGACY_MACRO = { OFFER18: 'aff_sub1,aff_sub2', TRACKIER: 'p2,source', TRACKIX: 'sub1,sub2', CUSTOM: 'p1' };
 const MAX_EVENTS = 20;
 $('f-events').innerHTML = Array.from({ length: MAX_EVENTS }, (_, i) => '<option value="' + (i + 1) + '">' + (i + 1) + (i ? ' Events' : ' Event') + '</option>').join('');
-function evRead() { return [...document.querySelectorAll('#f-evs .evrow')].map(r => ({ name: r.querySelector('.ev-n').value, payout: r.querySelector('.ev-p').value })); }
+function evRead() { return [...document.querySelectorAll('#f-evs .evrow')].map(r => { const p = r.querySelector('.ev-p'); return { name: r.querySelector('.ev-n').value, payout: p.disabled ? '0' : p.value }; }); }
 function evTotal() { $('f-total').textContent = inr(evRead().reduce((s, e) => s + (Number(e.payout) || 0), 0)); }
-// Draws exactly n event rows and keeps whatever was already typed in them.
-function evBuild(n, vals) {
+const evPayIdx = () => [...document.querySelectorAll('#f-evs .ev-r')].findIndex(x => x.checked);
+// Draws exactly n event rows and keeps what was typed. ONE row (the radio) carries the payout; the others are fixed at Rs0.
+function evBuild(n, vals, pay) {
   const cur = vals || evRead();
+  if (pay == null) { const k = evPayIdx(); pay = k >= 0 && k < n ? k : n - 1; }
   $('f-evs').innerHTML = Array.from({ length: n }, (_, i) => {
-    const v = cur[i] || { name: '', payout: '' };
+    const v = cur[i] || { name: '', payout: '' }, on = i === pay;
     return '<div class="evrow grid2"><input class="ev-n" placeholder="Event ' + (i + 1) + ' name' + (i === 0 ? ' (e.g. Install)' : i === 1 ? ' (e.g. Registration)' : i === 2 ? ' (e.g. KYC)' : '') + '" value="' + esc(v.name) + '">' +
-      '<input class="ev-p" type="number" min="0" step="any" placeholder="Event ' + (i + 1) + ' payout ₹" value="' + esc(v.payout) + '"></div>';
+      '<div style="display:flex;gap:8px;align-items:center"><label style="margin:0;display:flex;align-items:center;gap:5px;white-space:nowrap;font-size:11px;text-transform:none;letter-spacing:0;font-weight:700"><input type="radio" class="ev-r" name="payev"' + (on ? ' checked' : '') + ' style="width:auto;margin:0"> pays</label>' +
+      (on ? '<input class="ev-p" type="number" min="0" step="any" placeholder="Payout ₹" value="' + esc(Number(v.payout) > 0 ? v.payout : '') + '">' : '<input class="ev-p" type="number" value="0" disabled style="opacity:.5">') + '</div></div>';
   }).join('');
   $('f-events').value = n; evTotal();
 }
+// Moving the radio moves the typed amount to the chosen event.
+$('f-evs').addEventListener('change', e => {
+  if (!e.target.classList.contains('ev-r')) return;
+  const rows = [...document.querySelectorAll('#f-evs .evrow')], amount = (rows.map(r => r.querySelector('.ev-p')).find(i => !i.disabled) || {}).value || '';
+  rows.forEach(r => { const on = r.querySelector('.ev-r').checked, p = r.querySelector('.ev-p'); p.disabled = !on; p.style.opacity = on ? '' : '.5'; p.value = on ? amount : '0'; if (on) p.placeholder = 'Payout ₹'; });
+  evTotal();
+});
 $('f-events').addEventListener('change', () => evBuild(Number($('f-events').value) || 1));
 $('f-evs').addEventListener('input', evTotal);
 function logoPrev() {
@@ -144,7 +154,8 @@ function startForm(c) {
   $('f-link').value = v.affiliate_link || '';
   $('f-macro').value = v.click_macro || (c ? LEGACY_MACRO[String(v.click_platform || 'CUSTOM').toUpperCase()] || 'p1' : '');
   const evs = c && v.events && v.events.length ? v.events : [{ name: c ? 'INSTALL' : '', payout: '' }];
-  evBuild(evs.length, evs.map(x => ({ name: x.name, payout: c ? x.payout : '' })));
+  const payAt = evs.reduce((k, x, i) => Number(x.payout) > 0 ? i : k, evs.length - 1); // the event that pays (last one with a payout)
+  evBuild(evs.length, evs.map(x => ({ name: x.name, payout: c ? x.payout : '' })), payAt);
   $('f-user').value = c && Number(v.user_default_payout) !== Number(v.total_payout) ? v.user_default_payout : '';
   $('f-rules').value = c ? (v.instructions || '') : ''; $('f-notes').value = v.notes || ''; $('f-logo').value = v.logo_url || '';
   const cf = c ? (v.collect_fields == null ? ['NAME', ...String(v.extra_fields_required || '').split(',').filter(Boolean)] : String(v.collect_fields).split(',')) : ['MOBILE'];
@@ -156,7 +167,7 @@ $('f-save').addEventListener('click', async () => {
   const msg = (t, c) => { $('f-msg').textContent = t; $('f-msg').className = 'msg ' + c; };
   const evs = evRead(), n = evs.length;
   const body = {
-    campaign_name: $('f-name').value, events: evs, total_events: n, platform: $('f-platform').value, click_macro: $('f-macro').value,
+    campaign_name: $('f-name').value, events: evs, payout_event: evPayIdx() + 1, total_events: n, platform: $('f-platform').value, click_macro: $('f-macro').value,
     affiliate_link: $('f-link').value, user_default_payout: $('f-user').value, instructions: $('f-rules').value,
     notes: $('f-notes').value, logo_url: $('f-logo').value, collect_fields: ['NAME', 'MOBILE', 'GMAIL'].filter(k => $('f-fld-' + k.toLowerCase()).checked).join(','), multiple_allowed: $('f-multi').value, max_conversions_per_upi: $('f-max').value
   };
@@ -279,7 +290,12 @@ async function loadDb(first) {
 $('db-tabs').addEventListener('click', e => { const b = e.target.closest('[data-db]'); if (!b) return; DB.tab = b.dataset.db; DB.page = 1; $('db-q').value = ''; loadDb(); });
 $('db-prev').addEventListener('click', () => { if (DB.page > 1) { DB.page--; loadDb(); } });
 $('db-next').addEventListener('click', () => { if (DB.page < DB.pages) { DB.page++; loadDb(); } });
-let dbT; $('db-q').addEventListener('input', () => { clearTimeout(dbT); dbT = setTimeout(() => { DB.page = 1; loadDb(); }, 400); });
+let dbT; $('ipcheck').addEventListener('click', async e => {
+  e.preventDefault();
+  try { const r = await call('/debug/ip'); alert('Visitor IP the server will record: ' + r.detected + '\n(used for rate limits: ' + r.usedForRateLimit + ')\n\nSeen on this request:\n' + Object.entries(r.seen).map(([k, v]) => k + ': ' + (v || '-')).join('\n')); }
+  catch (err) { alert(err.message); }
+});
+$('db-q').addEventListener('input', () => { clearTimeout(dbT); dbT = setTimeout(() => { DB.page = 1; loadDb(); }, 400); });
 
 // ---------- Referral links ----------
 function renderLinks() {
@@ -307,6 +323,7 @@ function partyCell(c, party) {
   if (party === 'REFERRER' && st === 'CREDITED') return '<span class="badge b-ok">IN WALLET</span> <span class="amt">' + inr(amt) + '</span><div class="acts" style="margin-top:6px"><button class="mini danger" data-act="rej" data-id="' + c.id + '" data-party="REFERRER">Reverse</button></div>';
   if (party === 'REFERRER' && st === 'PENDING') return '<span class="amt">' + inr(amt) + '</span><div class="small">No wallet credit yet</div>';
   if (st === 'PAID') return '<span class="badge b-ok">PAID</span>';
+  if (party === 'USER' && st === 'PENDING' && amt <= 0 && userPaid(c) <= 0) return '<span class="small">Payout event not reached yet</span>';
   if (st === 'REJECTED') return '<span class="badge b-bad">REJECTED</span>' + ((party === 'USER' ? c.user_note : c.ref_note) ? '<div class="small">' + esc(party === 'USER' ? c.user_note : c.ref_note) + '</div>' : '');
   return '<span class="amt">' + inr(amt) + '</span>' + paidNote + '<div class="acts" style="margin-top:6px"><button class="mini ok" data-act="pay" data-id="' + c.id + '" data-party="' + party + '">Pay</button><button class="mini danger" data-act="rej" data-id="' + c.id + '" data-party="' + party + '">Reject</button></div>';
 }

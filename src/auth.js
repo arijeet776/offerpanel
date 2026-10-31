@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { clientIp } = require('./util');
 
 const secret = () => process.env.ADMIN_TOKEN_SECRET || '';
 
@@ -38,7 +39,7 @@ function requireAdmin(req, res, next) {
 const buckets = new Map();
 function rateLimit(max, windowMs) {
   return (req, res, next) => {
-    const k = req.ip + '|' + req.baseUrl + req.path;
+    const k = clientIp(req) + '|' + req.baseUrl + req.path;
     const now = Date.now();
     let b = buckets.get(k);
     if (!b || b.reset < now) { b = { n: 0, reset: now + windowMs }; buckets.set(k, b); }
