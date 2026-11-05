@@ -296,7 +296,7 @@ async function trackerAttempts(upiRaw, cidRaw, limit) {
   if (!upi || upi.length > 100) throw new HttpError(400, 'Please enter a valid UPI ID.');
   const cid = U.clean(cidRaw).toUpperCase();
 
-  let q = sb.from('clicks').select('click_id,campaign_id,ref_id,name,created_at').eq('upi', upi); // UPIs are stored in lower case
+  let q = sb.from('clicks').select('click_id,campaign_id,ref_id,mobile,created_at').eq('upi', upi); // UPIs are stored in lower case
   if (cid) q = q.eq('campaign_id', cid);
   const { data: clicks, error } = await q.order('created_at', { ascending: false }).limit(limit);
   if (error) throw error;
@@ -349,7 +349,7 @@ async function trackerAttempts(upiRaw, cidRaw, limit) {
     const amount = got > 0 ? got : camp ? await expectedFor(camp, k.ref_id) : 0;
 
     return {
-      name: k.name || 'User',
+      mobile: U.maskMobile(k.mobile), // centre-masked, e.g. 98******10
       campaignId: k.campaign_id,
       campaign: camp ? camp.campaign_name : k.campaign_id,
       clickAt: k.created_at,

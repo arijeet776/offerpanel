@@ -12,6 +12,10 @@
 /admin         /404.html    404!
 
 # Pages
+/terms          /terms.html           200
+/privacy        /privacy.html         200
+/refund-policy  /refund-policy.html   200
+/contact        /contact.html         200
 /admin/DGSNR    /admin.html      200
 /referral       /dashboard.html  200
 /gen/:cid       /linkgen.html    200

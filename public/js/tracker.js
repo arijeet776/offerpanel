@@ -42,7 +42,7 @@ function payoutHtml(p) {
   return '<b>' + (p.amount > 0 ? inr(p.amount) : '—') + '</b> ' + payPill(p.status) + part;
 }
 function renderRecord(r, silent) {
-  $('vName').textContent = r.name || 'User';
+  $('vMob').textContent = r.mobile || 'Not provided';
   $('vClick').textContent = IST(r.clickAt);
   $('vUpd').textContent = r.updatedAt ? IST(r.updatedAt) : 'Task in progress';
   $('vCamp').textContent = r.campaign || 'N/A';
