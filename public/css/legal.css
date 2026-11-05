@@ -1,12 +1,12 @@
 /* Footer used on every public page + the layout of the legal pages. Uses the colour variables of brand.css / prelander.css. */
-.sfoot{margin:22px 0 4px;padding:16px 14px;border-radius:18px;background:rgba(255,255,255,.78);border:1px solid var(--line,rgba(10,26,92,.22));text-align:center;font-size:11.5px;line-height:1.65;color:var(--mute,#4A5885)}
-.sf-links{display:flex;flex-wrap:wrap;justify-content:center;gap:5px 15px;margin-bottom:11px}
-.sf-links a{color:var(--ink,#0A1A5C);font-weight:700;text-decoration:none;border-bottom:1.5px solid rgba(10,154,245,.55);padding-bottom:1px}
-.sf-id{display:flex;flex-direction:column;gap:1px;margin-bottom:11px}.sf-id b{color:var(--ink,#0A1A5C);font-size:13px;letter-spacing:.01em}
-.sf-id a{color:var(--ink,#0A1A5C);font-weight:700;text-decoration:none}
-.sf-sec{display:inline-flex;align-items:flex-start;gap:7px;max-width:100%;padding:8px 12px;border-radius:12px;background:var(--card2,#F1F8EE);border:1px solid rgba(63,138,18,.35);color:var(--green-d,#3F8A12);font-weight:700;text-align:left}
-.sf-sec svg{flex:none;margin-top:3px}
-.sf-copy{margin-top:11px;font-size:10.5px;opacity:.9}
+.sfoot{margin:18px 0 2px;padding:14px 4px 0;text-align:center;font-size:11px;line-height:1.6;color:var(--mute,#4A5885);background:linear-gradient(90deg,transparent,rgba(10,26,92,.22),transparent) top/100% 1px no-repeat}
+.sf-wait{display:none}
+.sf-links{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:2px 8px;margin-bottom:9px}
+.sf-links a{color:var(--ink,#0A1A5C);font-weight:700;font-size:11px;text-decoration:none}.sf-links a:hover{text-decoration:underline}
+.sf-links i{font-style:normal;opacity:.5}
+.sf-sec{display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:4px 11px;border-radius:999px;background:var(--card2,#F1F8EE);border:1px solid rgba(63,138,18,.3);color:var(--green-d,#3F8A12);font-weight:700;font-size:10.5px;text-align:left}
+.sf-sec svg{flex:none}
+.sf-copy{margin:9px 0 0;font-size:10px;line-height:1.55;opacity:.92}.sf-copy a{color:inherit;font-weight:700;text-decoration:none}
 .si-missing{color:var(--rose,#D14343);font-weight:700;border-bottom:1px dashed var(--rose,#D14343)}
 .consent{margin:12px 2px 0;text-align:center;font-size:11px;line-height:1.55;color:var(--mute,#4A5885)}
 .consent a{color:var(--ink,#0A1A5C);font-weight:700;text-decoration:underline;text-underline-offset:2px}

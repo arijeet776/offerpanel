@@ -23,6 +23,6 @@
   document.querySelectorAll('[data-year]').forEach(function (el) { el.textContent = new Date().getFullYear(); });
 
   var sec = document.getElementById('sfSecTxt');
-  if (sec) sec.textContent = location.protocol === 'https:' ? 'Secure HTTPS connection (TLS encrypted)' : 'Served over secure HTTPS when live';
+  if (sec) sec.textContent = location.protocol === 'https:' ? 'Secure HTTPS' : 'HTTPS secured when live';
   if (todo.length && window.console) console.warn('[site-info] still to fill in public/js/site-info.js:', todo.filter(function (x, i) { return todo.indexOf(x) === i; }).join(', '));
 })();

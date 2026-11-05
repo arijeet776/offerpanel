@@ -38,6 +38,7 @@ function show(t, type) { $('msg').textContent = t; $('msg').className = 'msg ' +
     if (pts.length === 1) { pts = raw.split('.').map(s => s.trim()).filter(Boolean); dot = true; }
     if (live && pts.length) { pts.forEach(p => { const li = document.createElement('li'); li.textContent = dot ? p + '.' : p; $('nl').appendChild(li); }); $('notes').classList.remove('hidden'); }
   } catch (e) { fail(e.message || 'Offer not found.'); }
+  const sf = document.querySelector('.sfoot'); if (sf) sf.classList.remove('sf-wait'); // footer appears only after the logo-only loading state
 })();
 
 // ---- reCAPTCHA (shown only when the server has a site key) ----
