@@ -42,7 +42,7 @@ function payoutHtml(p) {
   return '<b>' + (p.amount > 0 ? inr(p.amount) : '—') + '</b> ' + payPill(p.status) + part;
 }
 function renderRecord(r, silent) {
-  $('vMob').textContent = r.mobile || 'Not provided';
+  [['Name', r.name], ['Mob', r.mobile], ['Mail', r.gmail]].forEach(([k, v]) => { $('v' + k).textContent = v || ''; $('r' + k).classList.toggle('hidden', !v); }); // only details this campaign asked for
   $('vClick').textContent = IST(r.clickAt);
   $('vUpd').textContent = r.updatedAt ? IST(r.updatedAt) : 'Task in progress';
   $('vCamp').textContent = r.campaign || 'N/A';

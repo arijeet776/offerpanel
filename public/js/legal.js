@@ -14,10 +14,11 @@
     if (kind === 'mail' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) el.setAttribute('href', 'mailto:' + v);
     if (kind === 'tel') { var d = v.replace(/\D/g, ''); if (d.length >= 10) el.setAttribute('href', 'tel:+' + (d.length === 10 ? '91' + d : d)); }
   });
-  document.querySelectorAll('[data-si="supportHandle"]').forEach(function (el) {
-    var m = /telegram\s*@?([A-Za-z0-9_]{4,})/i.exec(raw('supportHandle')); if (!m) return;
-    var a = document.createElement('a'); a.href = 'https://t.me/' + m[1]; a.target = '_blank'; a.rel = 'noopener'; a.textContent = raw('supportHandle');
-    el.textContent = ''; el.appendChild(a);
+  // Telegram support bot: shown as a link on the Contact page and in the policies
+  var bot = raw('supportBot'), botUrl = /^https?:\/\//i.test(bot) ? bot : /^@?[A-Za-z0-9_]{5,}$/.test(bot) ? 'https://t.me/' + bot.replace(/^@/, '') : '';
+  document.querySelectorAll('[data-si="supportBot"]').forEach(function (el) {
+    if (!botUrl) return; var m = /t\.me\/([A-Za-z0-9_]+)/.exec(botUrl), a = document.createElement('a');
+    a.href = botUrl; a.target = '_blank'; a.rel = 'noopener'; a.textContent = m ? '@' + m[1] : botUrl; el.textContent = ''; el.appendChild(a);
   });
   document.querySelectorAll('[data-si-optional]').forEach(function (el) { if (!raw(el.getAttribute('data-si-optional'))) el.style.display = 'none'; });
   document.querySelectorAll('[data-year]').forEach(function (el) { el.textContent = new Date().getFullYear(); });

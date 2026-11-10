@@ -1,15 +1,14 @@
 // ===== Business details shown in the footer and on the legal pages =====
 // This is the ONLY file you need to edit for contact / business details. A value that starts with REPLACE shows up on the site as a red "[Add ...]" marker.
-// The phone number and the Telegram handle appear on the Contact Us page (the phone also inside the policies), not in the footers.
+// Support contact is the email plus the Telegram support bot (no phone number is shown anywhere).
 window.SITE_INFO = {
   brandName: 'Digi Sanchaar',
   legalName: 'Digi Sanchaar (Proprietor: Saumya Tiwari)',
   email: 'digisanchaar7@gmail.com',
-  phone: '+91 9336550512',
-  supportHandle: 'Telegram @Digisanchaar1',
   address: 'Gaytri Nagar, Amethi, Lucknow, Uttar Pradesh - 227405',
   supportHours: 'Monday to Friday, 10:00 AM to 6:00 PM IST',
   grievanceOfficer: 'Saumya Tiwari',
+  supportBot: '@digisanchaar_support_bot',                            // shown on the Contact Us page and in the policies. The round button on the offer page is set per campaign in the admin panel.
   grievanceEmail: '',                                                 // leave '' to use the support email above
   jurisdictionCity: 'Amethi Tehsil, Amethi, Lucknow, Uttar Pradesh - 227405',
 

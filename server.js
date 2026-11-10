@@ -64,3 +64,8 @@ app.use((err, req, res, next) => {
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log('Digi Sanchaar API listening on ' + port));
+
+// Supabase free plan pauses a project after 7 days without activity: ping it every few days (set KEEPALIVE=off to disable).
+if (String(process.env.KEEPALIVE || '').toLowerCase() !== 'off') {
+  try { require('./src/keepalive').start(); } catch (e) { console.error('[keepalive] could not start:', e.message); }
+}

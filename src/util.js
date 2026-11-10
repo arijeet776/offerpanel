@@ -25,6 +25,9 @@ const clientIp = (req, loose) => {
   const ip = (custom && one(custom)) || one('cf-connecting-ip') || one('true-client-ip') || (loose && one('x-forwarded-for')) || req.ip || '';
   return String(ip).replace(/^::ffff:/, '').slice(0, 64);
 };
+// Ravi Kumar -> Ra*** Ku***, ravi.k@gmail.com -> ra***@gmail.com (the tracker shows only masked details)
+const maskName = v => String(v || '').trim().split(/\s+/).filter(Boolean).map(w => w.length <= 2 ? w[0] + '*'.repeat(w.length - 1) : w.slice(0, 2) + '*'.repeat(Math.min(w.length - 2, 5))).join(' ');
+const maskEmail = v => { const s = String(v || '').trim(), at = s.lastIndexOf('@'); if (at < 1) return ''; const n = s.slice(0, at); return n.slice(0, Math.min(2, n.length)) + '*'.repeat(Math.max(2, Math.min(n.length - 2, 6))) + s.slice(at); };
 const ah = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 class HttpError extends Error {
@@ -101,4 +104,4 @@ function convEvents(r) {
     .filter(e => e[1]).map(e => ({ no: e[0], name: e[1], at: e[2] }));
 }
 
-module.exports = { MAX_EVENTS, campEvents, convEvents, genCampaignId, genRefId, parseMacros, macroList, clean, num, genId, isValidUpi, isEmail, normMobile, maskMobile, clientIp, likeEscape, normName, ah, HttpError, buildRedirect, userPayoutFor, CLICK_ID_MACRO_MAP };
+module.exports = { MAX_EVENTS, campEvents, convEvents, genCampaignId, genRefId, parseMacros, macroList, clean, num, genId, isValidUpi, isEmail, normMobile, maskMobile, maskName, maskEmail, clientIp, likeEscape, normName, ah, HttpError, buildRedirect, userPayoutFor, CLICK_ID_MACRO_MAP };

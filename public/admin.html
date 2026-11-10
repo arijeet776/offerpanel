@@ -54,6 +54,9 @@
   <h3 style="margin:6px 0 0">1. Brand</h3>
   <label>Campaign Name</label><input id="f-name" placeholder="e.g. XYZ KYC Camp">
   <label>Brand Logo URL</label><input id="f-logo" placeholder="https://.../logo.png">
+  <label>Brand logo shape on the offer page</label><select id="f-shape"><option value="CIRCLE">Circle</option><option value="SQUARE">Rounded square</option></select>
+  <label>Round support button on the offer page</label><select id="f-sup"><option value="SHOW">Show</option><option value="HIDE">Hide</option></select>
+  <div id="f-supw"><input id="f-supurl" placeholder="Where it opens, e.g. https://t.me/YourBot or @YourBot"><div class="hint">Any link works (Telegram, WhatsApp, a form...). Click opens this link.</div></div>
   <div id="f-logo-prev" class="hidden" style="margin-top:8px"><img id="f-logo-img" alt="" style="height:52px;max-width:160px;object-fit:contain;border-radius:10px;background:#fff;padding:4px"></div>
   <label>Platform (optional, only a label for you)</label><select id="f-platform"><option value="">Select platform</option><option>HIQ Mobi</option><option>Offer18</option><option>Trackier</option><option>Trackix</option><option>Custom</option></select>
 
@@ -79,6 +82,7 @@
   <label style="display:flex;align-items:center;gap:10px;margin:9px 0 0;text-transform:none;letter-spacing:0;font-size:13px;font-weight:600"><input type="checkbox" id="f-fld-mobile" style="width:18px;height:18px;padding:0;margin:0;flex:none"> Mobile number</label>
   <label style="display:flex;align-items:center;gap:10px;margin:9px 0 0;text-transform:none;letter-spacing:0;font-size:13px;font-weight:600"><input type="checkbox" id="f-fld-name" style="width:18px;height:18px;padding:0;margin:0;flex:none"> Full name</label>
   <label style="display:flex;align-items:center;gap:10px;margin:9px 0 0;text-transform:none;letter-spacing:0;font-size:13px;font-weight:600"><input type="checkbox" id="f-fld-gmail" style="width:18px;height:18px;padding:0;margin:0;flex:none"> Gmail ID</label>
+  <div class="hint">Tick only what this campaign needs. Leave all three unticked to ask for the UPI ID only.</div>
   <p style="font-size:11.5px;opacity:.7;margin:6px 0 4px">General default: UPI ID + Mobile number. Tick anything else this campaign needs.</p>
   <div class="grid2"><div><label>Allow Multiple Links per UPI</label><select id="f-multi"><option value="NO">Off</option><option value="YES">On</option></select></div>
   <div><label>Max Conversions per UPI</label><input id="f-max" type="number" min="1" placeholder="Blank = unlimited"></div></div>

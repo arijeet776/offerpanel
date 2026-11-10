@@ -179,6 +179,10 @@ function buildCampaign(b) {
   if (!/^https?:\/\//i.test(link)) throw new HttpError(400, 'Tracking link must start with http:// or https://');
   const logo = U.clean(b.logo_url);
   if (logo && !/^https?:\/\//i.test(logo)) throw new HttpError(400, 'Logo URL must start with http:// or https://');
+  // Support button: '' = no button; otherwise a full https:// link (a @telegram username is turned into its t.me link)
+  const supRaw = String(b.support_url == null ? '' : b.support_url).trim(), supAt = /^@([A-Za-z0-9_]{5,32})$/.exec(supRaw);
+  const supportUrl = supAt ? 'https://t.me/' + supAt[1] : supRaw;
+  if (supportUrl && (!/^https?:\/\/\S+$/i.test(supportUrl) || supportUrl.length > 500)) throw new HttpError(400, 'Support button link must be a full https:// link (or a @telegram username).');
   const macros = U.parseMacros(b.click_macro);
   if (!macros) throw new HttpError(400, 'Click ID macro is required: type the parameter name where our Click ID goes (e.g. aff_sub1). Letters, numbers, _ - . only; separate several with commas.');
 
@@ -209,7 +213,7 @@ function buildCampaign(b) {
 
   let user = U.num(b.user_default_payout, 0);
   if (user <= 0 || user > total) user = total;
-  const want = (Array.isArray(b.collect_fields) ? b.collect_fields : String(b.collect_fields == null ? 'MOBILE' : b.collect_fields).split(',')).map(s => String(s).trim().toUpperCase());
+  const want = (Array.isArray(b.collect_fields) ? b.collect_fields : String(b.collect_fields == null ? '' : b.collect_fields).split(',')).map(s => String(s).trim().toUpperCase());
   const fields = FIELD_KEYS.filter(k => want.includes(k));
   const max = parseInt(b.max_conversions_per_upi, 10);
   return {
@@ -221,15 +225,23 @@ function buildCampaign(b) {
     notes: U.clean(b.notes), instructions: U.clean(b.instructions) || 'Follow standard campaign rules.',
     multiple_allowed: String(b.multiple_allowed).toUpperCase() === 'YES' ? 'YES' : 'NO',
     max_conversions_per_upi: max > 0 ? max : null, campaign_type: 'ONLINE',
-    collect_fields: fields.join(','), extra_fields_required: fields.filter(k => k !== 'NAME').join(','), logo_url: logo
+    collect_fields: fields.join(','), extra_fields_required: fields.filter(k => k !== 'NAME').join(','), logo_url: logo,
+    logo_shape: String(b.logo_shape || '').toUpperCase() === 'SQUARE' ? 'SQUARE' : 'CIRCLE',
+    support_url: supportUrl || null
   };
 }
+
+// If the newer columns (logo_shape, support_url) are not in the database yet, save everything else instead of failing.
+const noShape = row => { const { logo_shape, support_url, ...rest } = row; return rest; };
+const missingShape = e => !!e && /logo_shape|support_url/i.test(String(e.message || '') + String(e.details || ''));
 
 router.post('/campaigns', ah(async (req, res) => {
   const row = buildCampaign(req.body || {});
   for (let i = 0; i < 5; i++) {
     const id = U.genCampaignId();
-    const { error } = await sb.from('campaigns').insert({ ...row, campaign_id: id, status: 'ACTIVE' });
+    let r = await sb.from('campaigns').insert({ ...row, campaign_id: id, status: 'ACTIVE' });
+    if (missingShape(r.error)) r = await sb.from('campaigns').insert({ ...noShape(row), campaign_id: id, status: 'ACTIVE' });
+    const { error } = r;
     if (!error) return res.json({ success: true, message: 'Campaign added successfully!', campaignId: id });
     if (error.code !== '23505') throw error;
   }
@@ -245,7 +257,9 @@ router.patch('/campaigns/:id', ah(async (req, res) => {
     if (!['ACTIVE', 'PAUSED', 'ENDED'].includes(st)) throw new HttpError(400, 'Invalid status.');
     patch = { status: st };
   }
-  const { data, error } = await sb.from('campaigns').update(patch).eq('campaign_id', req.params.id).select('campaign_id');
+  let r = await sb.from('campaigns').update(patch).eq('campaign_id', req.params.id).select('campaign_id');
+  if (missingShape(r.error)) r = await sb.from('campaigns').update(noShape(patch)).eq('campaign_id', req.params.id).select('campaign_id');
+  const { data, error } = r;
   if (error) throw error;
   if (!data.length) throw new HttpError(404, 'Campaign not found.');
   res.json({ success: true, message: 'Campaign updated.' });

@@ -18,13 +18,18 @@ function show(t, type) { $('msg').textContent = t; $('msg').className = 'msg ' +
     $('price').textContent = '₹' + c.userPayout;
     $('tag').textContent = live ? 'LIVE' : 'INACTIVE';
     $('tag').classList.toggle('off', !live);
-    $('ring').style.setProperty('--ring', live ? '#5DB32B' : '#ef4444');
+    $('ring').style.setProperty('--ring', live ? '#5DB32B' : '#ef4444'); $('ring').classList.toggle('sq', c.logoShape === 'SQUARE');
+    const sbot = $('sbot'); // round support button: shown only when the campaign has a link; Telegram icon for t.me links, a chat icon otherwise
+    if (sbot && c.supportUrl) {
+      sbot.setAttribute('href', c.supportUrl);
+      if (!/^https?:\/\/(www\.)?(t\.me|telegram\.(me|org))\//i.test(c.supportUrl)) sbot.innerHTML = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.8 8.8 0 0 1-3.6-.8L3 21l1.9-5.1A8.4 8.4 0 1 1 21 11.5z"/></svg>';
+    }
     if (!live) { // paused or ended: no form at all, only a clear message
       const ended = c.status === 'ENDED';
       $('cdot').style.background = '#ef4444'; $('tag').textContent = ended ? 'ENDED' : 'PAUSED';
       $('pi').textContent = ended ? '🏁' : '⏸'; $('pt').textContent = ended ? 'Offer Ended' : 'Offer Paused';
       $('pp').textContent = ended ? 'This offer has ended and is no longer taking new entries.' : 'This offer is paused right now. No need to fill any details. Please check back later.';
-      ['price', 'sub', 'f'].forEach(id => $(id).classList.add('hidden')); $('paused').classList.remove('hidden');
+      ['price', 'f'].forEach(id => $(id).classList.add('hidden')); $('paused').classList.remove('hidden');
     }
     const fb = () => { $('ringin').textContent = c.name.slice(0, 3).toUpperCase(); };
     if (c.logo) { const i = new Image(); i.alt = c.name; i.onerror = fb; i.src = c.logo; $('ringin').appendChild(i); } else fb();
@@ -38,7 +43,8 @@ function show(t, type) { $('msg').textContent = t; $('msg').className = 'msg ' +
     if (pts.length === 1) { pts = raw.split('.').map(s => s.trim()).filter(Boolean); dot = true; }
     if (live && pts.length) { pts.forEach(p => { const li = document.createElement('li'); li.textContent = dot ? p + '.' : p; $('nl').appendChild(li); }); $('notes').classList.remove('hidden'); }
   } catch (e) { fail(e.message || 'Offer not found.'); }
-  const sf = document.querySelector('.sfoot'); if (sf) sf.classList.remove('sf-wait'); // footer appears only after the logo-only loading state
+  const sb2 = $('sbot'); if (sb2 && sb2.getAttribute('href') === '#') sb2.remove(); // no link set for this campaign (or the offer failed to load): no button
+  document.querySelectorAll('.sf-wait').forEach(el => el.classList.remove('sf-wait')); // footer and support button appear only after the logo-only loading state
 })();
 
 // ---- reCAPTCHA (shown only when the server has a site key) ----

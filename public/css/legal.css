@@ -44,3 +44,9 @@
  .lg-card{padding:22px 16px;border-radius:20px}.lg-card h1{font-size:21px}.lg-toc{columns:1}.lg-head img{height:44px}
  .lg-id{grid-template-columns:1fr}.lg-id dt{border-bottom:none;padding-bottom:2px}.lg-id dd{padding-top:2px}
 }
+
+/* Telegram support-bot button (offer page) */
+.sbot{position:fixed;right:16px;bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:60;width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;text-decoration:none;background:linear-gradient(135deg,var(--sky,#0A9AF5),var(--ink,#0A1A5C));box-shadow:0 10px 26px rgba(10,26,92,.38),0 0 0 3px #fff}
+.sbot:before{content:"";position:absolute;inset:-3px;border-radius:50%;border:2px solid var(--sky,#0A9AF5);opacity:.5;animation:sbp 2.4s ease-out infinite}
+.sbot svg{margin-left:-2px}.sbot.sf-wait{display:none}
+@keyframes sbp{0%{transform:scale(1);opacity:.55}100%{transform:scale(1.5);opacity:0}}

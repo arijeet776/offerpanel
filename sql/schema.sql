@@ -522,3 +522,9 @@ create index if not exists clicks_upi_idx on clicks (upi);
 create index if not exists clicks_created_idx on clicks (created_at desc);
 create index if not exists conversions_created_idx on conversions (created_at desc);
 create index if not exists wallet_conv_idx on wallet_ledger (conversion_id);
+
+-- Shape of the brand logo on the offer page (CIRCLE or SQUARE = rounded square), chosen per campaign
+alter table campaigns add column if not exists logo_shape text default 'CIRCLE';
+
+-- Where the round support button on the offer page opens (empty = no button), chosen per campaign
+alter table campaigns add column if not exists support_url text;

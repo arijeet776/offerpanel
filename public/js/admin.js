@@ -158,20 +158,27 @@ function startForm(c) {
   evBuild(evs.length, evs.map(x => ({ name: x.name, payout: c ? x.payout : '' })), payAt);
   $('f-user').value = c && Number(v.user_default_payout) !== Number(v.total_payout) ? v.user_default_payout : '';
   $('f-rules').value = c ? (v.instructions || '') : ''; $('f-notes').value = v.notes || ''; $('f-logo').value = v.logo_url || '';
-  const cf = c ? (v.collect_fields == null ? ['NAME', ...String(v.extra_fields_required || '').split(',').filter(Boolean)] : String(v.collect_fields).split(',')) : ['MOBILE'];
-  $('f-fld-name').checked = cf.includes('NAME'); $('f-fld-mobile').checked = cf.includes('MOBILE'); $('f-fld-gmail').checked = cf.includes('GMAIL'); $('f-multi').value = v.multiple_allowed || 'NO'; $('f-max').value = v.max_conversions_per_upi || '';
+  const cf = c ? (v.collect_fields == null ? ['NAME', ...String(v.extra_fields_required || '').split(',').filter(Boolean)] : String(v.collect_fields).split(',')) : [];
+  $('f-fld-name').checked = cf.includes('NAME'); $('f-fld-mobile').checked = cf.includes('MOBILE'); $('f-fld-gmail').checked = cf.includes('GMAIL'); $('f-shape').value = String(v.logo_shape || 'CIRCLE').toUpperCase() === 'SQUARE' ? 'SQUARE' : 'CIRCLE'; const sup = c ? String(v.support_url || '') : DEFAULT_SUPPORT_LINK; $('f-sup').value = sup ? 'SHOW' : 'HIDE'; $('f-supurl').value = sup; $('f-supw').classList.toggle('hidden', !sup); $('f-multi').value = v.multiple_allowed || 'NO'; $('f-max').value = v.max_conversions_per_upi || '';
   logoPrev();
 }
 $('f-cancel').addEventListener('click', () => { startForm(null); go('campaigns'); });
+// First suggestion for a new campaign's support button (change it here, or edit the link per campaign in the form)
+const DEFAULT_SUPPORT_LINK = 'https://t.me/digisanchaar_support_bot';
+$('f-sup').addEventListener('change', () => {
+  const show = $('f-sup').value === 'SHOW'; $('f-supw').classList.toggle('hidden', !show);
+  if (show && !$('f-supurl').value.trim()) $('f-supurl').value = DEFAULT_SUPPORT_LINK;
+});
 $('f-save').addEventListener('click', async () => {
   const msg = (t, c) => { $('f-msg').textContent = t; $('f-msg').className = 'msg ' + c; };
   const evs = evRead(), n = evs.length;
   const body = {
     campaign_name: $('f-name').value, events: evs, payout_event: evPayIdx() + 1, total_events: n, platform: $('f-platform').value, click_macro: $('f-macro').value,
     affiliate_link: $('f-link').value, user_default_payout: $('f-user').value, instructions: $('f-rules').value,
-    notes: $('f-notes').value, logo_url: $('f-logo').value, collect_fields: ['NAME', 'MOBILE', 'GMAIL'].filter(k => $('f-fld-' + k.toLowerCase()).checked).join(','), multiple_allowed: $('f-multi').value, max_conversions_per_upi: $('f-max').value
+    notes: $('f-notes').value, logo_url: $('f-logo').value, logo_shape: $('f-shape').value, support_url: $('f-sup').value === 'SHOW' ? $('f-supurl').value.trim() : '', collect_fields: ['NAME', 'MOBILE', 'GMAIL'].filter(k => $('f-fld-' + k.toLowerCase()).checked).join(','), multiple_allowed: $('f-multi').value, max_conversions_per_upi: $('f-max').value
   };
   if (!body.campaign_name.trim() || !body.affiliate_link.trim()) return msg('Please fill Campaign Name and Tracking Link.', 'err');
+  if ($('f-sup').value === 'SHOW' && !body.support_url) return msg('Type where the support button should open, or choose Hide.', 'err');
   if (!body.click_macro.trim()) return msg('Please type the Click ID macro (the parameter where our Click ID goes).', 'err');
   for (let i = 0; i < n; i++) if (!evs[i].name.trim()) return msg('Please enter a name for Event ' + (i + 1) + '.', 'err');
   $('f-save').disabled = true; msg('Saving...', 'ok');
