@@ -1,7 +1,6 @@
-# Real static files first
+# Real static files first (never rewritten)
 /css/*   /css/:splat   200
 /js/*    /js/:splat    200
-# Netlify rewrites (first match wins). Files that really exist (/css, /js, /logo.png) are always served as they are.
 
 # Old query-style links -> new path-style links
 /   cid=:cid ref=:ref   /:cid/:ref   301
@@ -10,18 +9,18 @@
 /   page=ref            /referral    301
 /   page=mydashboard    /referral    301
 
-# The admin page is only reachable through the secret path below, never as /admin.html
+# Admin page only through the secret path
 /admin.html    /404.html    404!
 /admin         /404.html    404!
 
-# Pages
-/terms          /terms.html           200
-/privacy        /privacy.html         200
-/refund-policy  /refund-policy.html   200
-/contact        /contact.html         200
-/admin/DGSNR    /admin.html      200
-/referral       /dashboard.html  200
-/gen/:cid       /linkgen.html    200
-/gen            /linkgen.html    200
-/tracker/:cid   /tracker.html    200
-/:cid/:ref      /prelander.html  200
+# Pages (clean targets, no .html, so Cloudflare does not redirect)
+/terms          /terms           200
+/privacy        /privacy         200
+/refund-policy  /refund-policy   200
+/contact        /contact         200
+/admin/DGSNR    /admin           200
+/referral       /dashboard       200
+/gen/:cid       /linkgen         200
+/gen            /linkgen         200
+/tracker/:cid   /tracker         200
+/:cid/:ref      /prelander       200
