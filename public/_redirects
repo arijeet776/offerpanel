@@ -1,7 +1,6 @@
 # Real static files first
 /css/*   /css/:splat   200
 /js/*    /js/:splat    200
-/*.png   /:splat      200
 # Netlify rewrites (first match wins). Files that really exist (/css, /js, /logo.png) are always served as they are.
 
 # Old query-style links -> new path-style links
